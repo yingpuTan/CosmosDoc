@@ -1,0 +1,93 @@
+syntax = "proto3";
+/*
+    定义所有与订阅中心相关的消息
+ */
+package subcenter;
+
+//////////////////////////////////
+/*
+    推送配置，待实现
+*/
+message PushConfig
+{
+    int64 push_interval = 1; // 推送间隔
+}
+
+/*
+    topic数据需要根据不同的业务层来制定，制定后写在该proto注释里
+    行情：subcenter.quote
+*/
+message SubscribeReqMsg
+{
+    map<string,string> params      = 1; // 订阅的具体参数，可以查看接口文档，不同业务的可选参数不同
+    PushConfig         push_config = 2; // 推送配置
+}
+
+message SubscribeRspMsg
+{
+    SubscribeReqMsg submsg = 1; // 订阅的参数
+    int32           code   = 2; // 返回值
+    string          msg    = 3; // 错误信息
+}
+
+message SubscribeReq
+{
+    string                   topic = 1; // 订阅的数据类型
+    repeated SubscribeReqMsg req   = 2; // 具体数据
+}
+
+message SubscribeRsp
+{
+    string                   topic = 1; // 订阅的数据类型
+    repeated SubscribeRspMsg rsp   = 2;
+}
+
+message UnSubscribeReq
+{
+    string                   topic = 1; // 订阅的数据类型
+    repeated SubscribeReqMsg req   = 2;
+}
+
+message UnSubscribeRsp
+{
+    string                   topic = 1; // 订阅的数据类型
+    repeated SubscribeRspMsg rsp   = 2;
+}
+
+message SubcenterPush
+{
+    string             topic  = 1; // 订阅的数据类型
+    map<string,string> params = 2; // 数据提供的具体参数
+    string             userid = 3; // 用户id
+    bytes              msg    = 4; // 推送的消息
+    string             blacklist = 5; //黑名单
+    string             whitelist = 6; //白名单
+}
+
+message PluginQueryReq
+{
+    string user   = 1;
+    string action = 2;  //查询类型
+    string data   = 3;  //序列化数据
+}
+
+message PluginQueryRsp
+{
+    string data   = 1;  //返回序列化数据
+    int32  code   = 2; // 返回值
+    string msg    = 3; // 错误信息
+}
+
+message PluginDataReq
+{
+    string             id   = 1;    // 唯一标识
+    string             type = 2;    //数据类型
+    bytes              data = 3;    //序列化数据
+}
+
+message PluginDataRsp
+{
+    string             id   = 1;    // 查询请求的唯一标识  如果是推送可以不带
+    string             type = 2;    //数据类型
+    bytes              data = 3;    //序列化数据
+}

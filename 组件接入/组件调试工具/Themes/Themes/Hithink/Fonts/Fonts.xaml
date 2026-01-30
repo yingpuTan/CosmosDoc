@@ -1,0 +1,22 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ui="clr-namespace:System.Windows.Documents;assembly=PresentationUI"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <ResourceDictionary.MergedDictionaries>
+        
+        <ResourceDictionary>
+            <FontFamily x:Key="Font-Common">Microsoft Yahei</FontFamily>
+        </ResourceDictionary>
+
+        <ResourceDictionary>
+            <sys:Double x:Key="FontSize-Normal">12</sys:Double>
+            <sys:Double x:Key="FontSize-Medium">14</sys:Double>
+            <sys:Double x:Key="FontSize-Large">16</sys:Double>
+        </ResourceDictionary>
+
+    </ResourceDictionary.MergedDictionaries>
+
+    <FontFamily x:Key="FluentSystemIcons">pack://application:,,,/Cosmos.Gui.Wpf;component/Themes/Hithink/Fonts/#FluentSystemIcons-Regular</FontFamily>
+    <FontFamily x:Key="FluentSystemIconsFilled">pack://application:,,,/Cosmos.Gui.Wpf;component/Themes/Hithink/Fonts/#FluentSystemIcons-Filled</FontFamily>
+
+</ResourceDictionary>

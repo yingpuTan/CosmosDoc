@@ -1,0 +1,4 @@
+1.nupkg:项目依赖包，编译时需要配置nupkg的来源
+2.Cosmos.DataAccess.Trade:接口类，主要定义好接口提供组件使用
+3.Cosmos.DataAccess.Trade.HighGate:实现类，具体对接high网关代码
+4.Cosmos.App.Hithink.ComDemo:组件demo，怎么调用第三方服务接口

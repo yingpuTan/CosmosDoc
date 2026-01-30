@@ -1,0 +1,261 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ui="clr-namespace:System.Windows.Documents;assembly=PresentationUI"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <ResourceDictionary.MergedDictionaries>
+
+        <ResourceDictionary>
+            <Color x:Key="color-brand1">#1975FF</Color>
+            <Color x:Key="color-brand2">#4B91FA</Color>
+            <Color x:Key="color-brand3">#172A47</Color>
+            <Color x:Key="color-brand4">#21324C</Color>
+            <Color x:Key="color-brand5">#19427F</Color>
+            <Color x:Key="color-brand6">#202833</Color>
+
+            <Color x:Key="color-red1">#CC3030</Color>
+            <Color x:Key="color-red2">#F05656</Color>
+            <Color x:Key="color-red3">#7F2B2B</Color>
+            <Color x:Key="color-red4">#4C2121</Color>
+            <Color x:Key="color-red5">#8A3B3B</Color>
+            <Color x:Key="color-red6">#332020</Color>
+
+            <Color x:Key="color-green1">#0C993F</Color>
+            <Color x:Key="color-green2">#1DB856</Color>
+            <Color x:Key="color-green3">#197F3E</Color>
+            <Color x:Key="color-green4">#214C31</Color>
+            <Color x:Key="color-green5">#357A4F</Color>
+            <Color x:Key="color-green6">#1A281F</Color>
+
+            <Color x:Key="color-orange1">#CC6D00</Color>
+            <Color x:Key="color-orange2">#E5871C</Color>
+            <Color x:Key="color-orange3">#7F4F19</Color>
+            <Color x:Key="color-orange4">#4C3821</Color>
+            <Color x:Key="color-orange5">#875F31</Color>
+            <Color x:Key="color-orange6">#33291E</Color>
+
+            <Color x:Key="color-blue1">#1E68D6</Color>
+            <Color x:Key="color-blue2">#4791FF</Color>
+            <Color x:Key="color-blue3">#19427F</Color>
+            <Color x:Key="color-blue4">#1B3D70</Color>
+            <Color x:Key="color-blue5">#3C5B8A</Color>
+            <Color x:Key="color-blue6">#232E3D</Color>
+
+            <Color x:Key="color-background1">#333538</Color>
+            <Color x:Key="color-background2">#1D1D1F</Color>
+            <Color x:Key="color-background3">#494A4D</Color>
+            <Color x:Key="color-background4">#63656C</Color>
+            <Color x:Key="color-background5">#404042</Color>
+            <Color x:Key="color-background6">#2E2F33</Color>
+            <Color x:Key="color-background7">#212225</Color>
+            <Color x:Key="color-background8">#121214</Color>
+            <Color x:Key="color-background9">#121214</Color>
+            <Color x:Key="color-background9-65">#73121214</Color>
+            <Color x:Key="color-background9-75">#3D121214</Color>
+            <Color x:Key="color-background10">#182333</Color>
+            <Color x:Key="color-background11">#232529</Color>
+            <Color x:Key="color-background12">#484C52</Color>
+            <Color x:Key="color-background13">#2E2502</Color>
+            <Color x:Key="color-background14">#494A4D</Color>
+
+            <Color x:Key="color-font1">#F6F6F6</Color>
+            <Color x:Key="color-font2">#CFD0D1</Color>
+            <Color x:Key="color-font3">#63656C</Color>
+            <Color x:Key="color-font4">#54555C</Color>
+            <Color x:Key="color-font5">#FFFFFF</Color>
+            <Color x:Key="color-font6">#B7B7B8</Color>
+            <Color x:Key="color-font7">#B7B7B8</Color>
+            <Color x:Key="color-font8">#8F8F8F</Color>
+            <Color x:Key="color-font9">#D19191</Color>
+            <Color x:Key="color-font10">#82BC98</Color>
+
+            <Color x:Key="color-purple1">#6432E5</Color>
+            <Color x:Key="color-purple2">#8152FF</Color>
+            <Color x:Key="color-purple3">#5325CC</Color>
+            <Color x:Key="color-purple4">#23066E</Color>
+            <Color x:Key="color-purple5">#452E82</Color>
+            <Color x:Key="color-purple6">#0B0221</Color>
+
+            <Color x:Key="color-pinkpurple1">#A729CF</Color>
+            <Color x:Key="color-pinkpurple2">#C146E8</Color>
+            <Color x:Key="color-pinkpurple3">#901DB5</Color>
+            <Color x:Key="color-pinkpurple4">#570370</Color>
+            <Color x:Key="color-pinkpurple5">#702C85</Color>
+            <Color x:Key="color-pinkpurple6">#1C0124</Color>
+
+            <Color x:Key="color-magenta1">#D92BB4</Color>
+            <Color x:Key="color-magenta2">#F249CE</Color>
+            <Color x:Key="color-magenta3">#BF1F9D</Color>
+            <Color x:Key="color-magenta4">#77085F</Color>
+            <Color x:Key="color-magenta5">#8C3479</Color>
+            <Color x:Key="color-magenta6">#2B0323</Color>
+
+            <Color x:Key="color-orangered1">#E56B2E</Color>
+            <Color x:Key="color-orangered2">#FF884D</Color>
+            <Color x:Key="color-orangered3">#CC5A21</Color>
+            <Color x:Key="color-orangered4">#772B05</Color>
+            <Color x:Key="color-orangered5">#8C4F30</Color>
+            <Color x:Key="color-orangered6">#2B1002</Color>
+
+            <Color x:Key="color-cyan1">#22A8A8</Color>
+            <Color x:Key="color-cyan2">#3AC2C2</Color>
+            <Color x:Key="color-cyan3">#178F8F</Color>
+            <Color x:Key="color-cyan4">#066C6C</Color>
+            <Color x:Key="color-cyan5">#2E8080</Color>
+            <Color x:Key="color-cyan6">#021F1F</Color>
+
+            <Color x:Key="color-lime1">#6B911D</Color>
+            <Color x:Key="color-lime2">#84AB33</Color>
+            <Color x:Key="color-lime3">#577813</Color>
+            <Color x:Key="color-lime4">#4D7006</Color>
+            <Color x:Key="color-lime5">#68852E</Color>
+            <Color x:Key="color-lime6">#182402</Color>
+
+            <Color x:Key="color-yellow1">#A88D22</Color>
+            <Color x:Key="color-yellow2">#CCAF3D</Color>
+            <Color x:Key="color-yellow3">#9B821C</Color>
+            <Color x:Key="color-yellow4">#7A6305</Color>
+            <Color x:Key="color-yellow5">#8F7C31</Color>
+            <Color x:Key="color-yellow6">#2E2502</Color>
+
+        </ResourceDictionary>
+
+        <ResourceDictionary>
+            <!-- Theme Name -->
+            <sys:String x:Key="ColorScheme.zh-CN">Dark</sys:String>
+            <sys:String x:Key="ColorScheme.zh-TW">Dark</sys:String>
+            <sys:String x:Key="ColorScheme.en-US">Dark</sys:String>
+            <sys:String x:Key="ColorScheme.ja-JP">Dark</sys:String>
+
+            <SolidColorBrush x:Key="Brush.Color.Blue1" Color="{DynamicResource color-blue1}"/>
+            <SolidColorBrush x:Key="Brush.Color.Blue2" Color="{DynamicResource color-blue2}"/>
+            <SolidColorBrush x:Key="Brush.Color.Blue3" Color="{DynamicResource color-blue3}"/>
+            <SolidColorBrush x:Key="Brush.Color.Blue4" Color="{DynamicResource color-blue4}"/>
+            <SolidColorBrush x:Key="Brush.Color.Blue5" Color="{DynamicResource color-blue5}"/>
+
+            <SolidColorBrush x:Key="Brush.Color.Font5" Color="{DynamicResource color-font5}"/>
+            <SolidColorBrush x:Key="Brush.Color.Font8" Color="{DynamicResource color-font8}"/>
+
+            <SolidColorBrush x:Key="Brush.CaptionForeground" Color="{DynamicResource color-font1}"/>
+
+            <SolidColorBrush x:Key="Brush.WindowBackground" Color="{DynamicResource color-background1}"/>
+            <SolidColorBrush x:Key="Brush.WindowBackground2" Color="{DynamicResource color-background2}"/>
+            <SolidColorBrush x:Key="Brush.WindowHoverBackground" Color="{DynamicResource color-background9-75}"/>
+            <SolidColorBrush x:Key="Brush.WindowPressBackground" Color="{DynamicResource color-background9-65}"/>
+            <SolidColorBrush x:Key="Brush.HoverBackground" Color="{DynamicResource color-background3}"/>
+            <SolidColorBrush x:Key="Brush.InterfaceBorder" Color="{DynamicResource color-background5}"/>
+            <SolidColorBrush x:Key="Brush.BarBackground" Color="{DynamicResource color-background7}"/>
+            <SolidColorBrush x:Key="Brush.NormalBackground" Color="{DynamicResource color-background9}"/>
+            <SolidColorBrush x:Key="Brush.WindowBorder" Color="{DynamicResource color-background14}"/>
+            <SolidColorBrush x:Key="Brush.FloatingWindowBorder" Color="{DynamicResource color-blue1}"/>
+
+            <SolidColorBrush x:Key="Brush.WindowForeground" Color="{DynamicResource color-font1}"/>
+            <SolidColorBrush x:Key="Brush.WindowTitleForeground" Color="{DynamicResource color-font7}"/>
+
+            <SolidColorBrush x:Key="Brush.WindowTitleSelect" Color="{DynamicResource color-blue1}"/>
+            <SolidColorBrush x:Key="Brush.WindowTitleSelectFore" Color="{DynamicResource color-font5}"/>
+
+            <!-- button 已适配 -->
+            <SolidColorBrush x:Key="Button.Static.Background" Color="{DynamicResource color-background6}" />
+            <SolidColorBrush x:Key="Button.Static.Foreground" Color="{DynamicResource color-font2}" />
+            <SolidColorBrush x:Key="Button.Static.Border" Color="{DynamicResource color-background5}"/>
+            <SolidColorBrush x:Key="Button.PointerOver.Background" Color="{DynamicResource color-background6}" />
+            <SolidColorBrush x:Key="Button.PointerOver.Foreground" Color="{DynamicResource color-font1}" />
+            <SolidColorBrush x:Key="Button.PointerOver.Border" Color="{DynamicResource color-blue1}" />
+            <SolidColorBrush x:Key="Button.Pressed.Background" Color="{DynamicResource color-background7}"/>
+            <SolidColorBrush x:Key="Button.Pressed.Foreground" Color="{DynamicResource color-font1}" />
+            <SolidColorBrush x:Key="Button.Pressed.Border" Color="{DynamicResource color-blue2}" />
+            <SolidColorBrush x:Key="Button.Disabled.Background" Color="{DynamicResource color-background6}" />
+            <SolidColorBrush x:Key="Button.Disabled.Foreground" Color="{DynamicResource color-font4}" />
+            <SolidColorBrush x:Key="Button.Disabled.Border" Color="{DynamicResource color-background12}" />
+            <SolidColorBrush x:Key="Button5.Pressed.Foreground" Color="{DynamicResource color-blue3}" />
+
+            <!-- TextBox 已适配 -->
+            <SolidColorBrush x:Key="TextBox.Static.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="TextBox.Static.Foreground" Color="{DynamicResource color-font1}" />
+            <SolidColorBrush x:Key="TextBox.Static.Border" Color="{DynamicResource color-background5}" />
+            <SolidColorBrush x:Key="TextBox.PointerOver.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="TextBox.PointerOver.Foreground" Color="{DynamicResource color-font4}" />
+            <SolidColorBrush x:Key="TextBox.PointerOver.Border" Color="{DynamicResource color-blue1}" />
+            <SolidColorBrush x:Key="TextBox.Focus.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="TextBox.Focus.Foreground" Color="{DynamicResource color-font4}" />
+            <SolidColorBrush x:Key="TextBox.Focus.Border" Color="{DynamicResource color-background9}" />
+
+            <SolidColorBrush x:Key="ContextMenu.Border" Color="{DynamicResource color-blue1}"/>
+            <SolidColorBrush x:Key="ContextMenu.Background" Color="{DynamicResource color-background9}"/>
+            <SolidColorBrush x:Key="Menu.Disabled.Border" Color="{DynamicResource color-blue1}" />
+
+            <!-- ComboBox 已适配 -->
+            <SolidColorBrush x:Key="ComboBox.Static.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBox.Static.Border" Color="{DynamicResource color-background5}" />
+            <SolidColorBrush x:Key="ComboBox.Static.Glyph" Color="{DynamicResource color-font6}" />
+            <SolidColorBrush x:Key="ComboBox.Static.Editable.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBox.Static.Editable.Border" Color="{DynamicResource color-background5}" />
+            <SolidColorBrush x:Key="ComboBox.Static.Editable.Button.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBox.Static.Editable.Button.Border" Color="{DynamicResource color-background5}" />
+
+            <SolidColorBrush x:Key="ComboBox.PointerOver.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBox.PointerOver.Border" Color="{DynamicResource color-blue1}" />
+            <SolidColorBrush x:Key="ComboBox.PointerOver.Glyph" Color="{DynamicResource color-font6}" />
+            <SolidColorBrush x:Key="ComboBox.PointerOver.Editable.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBox.PointerOver.Editable.Border" Color="{DynamicResource color-blue1}" />
+            <SolidColorBrush x:Key="ComboBox.PointerOver.Editable.Button.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBox.PointerOver.Editable.Button.Border" Color="{DynamicResource color-blue1}" />
+
+            <SolidColorBrush x:Key="ComboBox.Pressed.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBox.Pressed.Border" Color="{DynamicResource color-blue1}" />
+            <SolidColorBrush x:Key="ComboBox.Pressed.Glyph" Color="{DynamicResource color-font6}" />
+            <SolidColorBrush x:Key="ComboBox.Pressed.Editable.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBox.Pressed.Editable.Border" Color="{DynamicResource color-blue1}" />
+            <SolidColorBrush x:Key="ComboBox.Pressed.Editable.Button.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBox.Pressed.Editable.Button.Border" Color="{DynamicResource color-blue1}" />
+
+            <SolidColorBrush x:Key="ComboBox.Disabled.Background" Color="{DynamicResource color-background7}" />
+            <SolidColorBrush x:Key="ComboBox.Disabled.Border" Color="{DynamicResource color-background5}" />
+            <SolidColorBrush x:Key="ComboBox.Disabled.Glyph" Color="{DynamicResource color-font4}" />
+            <SolidColorBrush x:Key="ComboBox.Disabled.Editable.Background" Color="{DynamicResource color-background7}" />
+            <SolidColorBrush x:Key="ComboBox.Disabled.Editable.Border" Color="{DynamicResource color-background5}" />
+            <SolidColorBrush x:Key="ComboBox.Disabled.Editable.Button.Background" Color="{DynamicResource color-background7}" />
+            <SolidColorBrush x:Key="ComboBox.Disabled.Editable.Button.Border" Color="{DynamicResource color-background5}" />
+
+            <SolidColorBrush x:Key="ComboBox.Drop.Background" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBox.Drop.Border" Color="{DynamicResource color-blue1}" />
+
+            <SolidColorBrush x:Key="ComboBoxItem.ItemsviewHover.Background" Color="{DynamicResource color-background7}" />
+            <SolidColorBrush x:Key="ComboBoxItem.ItemsviewHover.Border" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBoxItem.ItemsviewSelected.Background" Color="{DynamicResource color-background7}" />
+            <SolidColorBrush x:Key="ComboBoxItem.ItemsviewSelected.Border" Color="{DynamicResource color-background9}"/>
+            <SolidColorBrush x:Key="ComboBoxItem.ItemsviewSelectedHover.Background" Color="{DynamicResource color-background7}" />
+            <SolidColorBrush x:Key="ComboBoxItem.ItemsviewSelectedHover.Border" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBoxItem.ItemsviewSelectedNoFocus.Background" Color="{DynamicResource color-background7}" />
+            <SolidColorBrush x:Key="ComboBoxItem.ItemsviewSelectedNoFocus.Border" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBoxItem.ItemsviewFocus.Border" Color="{DynamicResource color-background9}" />
+            <SolidColorBrush x:Key="ComboBoxItem.ItemsviewHoverFocus.Background" Color="{DynamicResource color-background7}" />
+            <SolidColorBrush x:Key="ComboBoxItem.ItemsviewHoverFocus.Border" Color="{DynamicResource color-background9}" />
+
+            <SolidColorBrush x:Key="ListBox.Static.Background" Color="{DynamicResource color-background8}" />
+            <SolidColorBrush x:Key="Label.Static.Foreground" Color="{DynamicResource color-font4}" />
+
+            <SolidColorBrush x:Key="ScrollBar.Static.Background" Color="{DynamicResource color-background7}" />
+            <SolidColorBrush x:Key="ScrollBar.Static.Border" Color="{DynamicResource color-background6}" />
+            <SolidColorBrush x:Key="ScrollBar.Static.Glyph" Color="{DynamicResource color-font6}" />
+            <SolidColorBrush x:Key="ScrollBar.Static.Thumb" Color="{DynamicResource color-background6}" />
+
+            <SolidColorBrush x:Key="ScrollBar.PointerOver.Background" Color="{DynamicResource color-background7}" />
+            <SolidColorBrush x:Key="ScrollBar.PointerOver.Border" Color="{DynamicResource color-background6}" />
+            <SolidColorBrush x:Key="ScrollBar.PointerOver.Glyph" Color="{DynamicResource color-font1}" />
+            <SolidColorBrush x:Key="ScrollBar.PointerOver.Thumb"  Color="{DynamicResource color-background5}" />
+
+            <SolidColorBrush x:Key="ScrollBar.Pressed.Background" Color="{DynamicResource color-background7}" />
+            <SolidColorBrush x:Key="ScrollBar.Pressed.Border" Color="{DynamicResource color-background6}" />
+            <SolidColorBrush x:Key="ScrollBar.Pressed.Thumb" Color="{DynamicResource color-font1}" />
+            <SolidColorBrush x:Key="ScrollBar.Pressed.Glyph" Color="{DynamicResource color-background4}" />
+
+            <SolidColorBrush x:Key="TabItem.Static.Background" Color="{DynamicResource color-background7}"/>
+
+            <SolidColorBrush x:Key="AssetFall" Color="{DynamicResource color-green1}"/>
+            <SolidColorBrush x:Key="AssetRise" Color="{DynamicResource color-red1}"/>
+            <SolidColorBrush x:Key="HevoDataFieldValue" Color="{DynamicResource color-blue1}"/>
+        </ResourceDictionary>
+    </ResourceDictionary.MergedDictionaries>
+</ResourceDictionary>

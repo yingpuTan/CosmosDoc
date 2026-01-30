@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net5.0;net6.0;net7.0;net8.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <Version>0.0.58</Version>
+    <Authors>Cosmos Development Team</Authors>
+    <Company>Zhejiang RoyalFlush Network Technology Co., Ltd.</Company>
+    <Title>Cosmos DataAccess Trade</Title>
+    <Description>Cosmos.DataAccess provides Cosmos Data Access abstractions for Hithink PC Clients.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>PackageIcon.png</PackageIcon>
+    <PackageTags>Mini App,Cosmos,Hithink,RoyalFlush,Hithink,iFind</PackageTags>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <Configurations>Debug;Release;Publish</Configurations>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageOutputPath>D:\LocalPackages\$(DefaultPackageVersion)</PackageOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="PackageIcon.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="v1\CosmosIntergration\" />
+  </ItemGroup>
+</Project>

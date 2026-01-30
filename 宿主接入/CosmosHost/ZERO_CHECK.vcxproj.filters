@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\项目\银河\cosmos资料\1.接入文档 - 信创\宿主接入\CosmosHost\CMakeFiles\cd3ff9ba509a79c42244ec0b73184d1b\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{C77720DA-2E41-33E2-B212-5CB528ACFED6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

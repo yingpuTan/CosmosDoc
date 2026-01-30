@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+// 包名
+package ant.rpc;
+
+
+//////////////////////////////////////////////////////////////////
+message KafkaPayload
+{
+    bytes               serialized_data     = 1;    // 序列化内容，目前默认是type_name + content
+    string              topic_suffix        = 2;    // topic 后缀
+    string              keywords            = 3;    // 同zmq协议和multicast协议中的keywords
+	string              profile	            = 4;    // 所在环境的环境变量profile值
+	uint64				incr_id				= 5;	// 自增序列id，0为重置起始值
+}

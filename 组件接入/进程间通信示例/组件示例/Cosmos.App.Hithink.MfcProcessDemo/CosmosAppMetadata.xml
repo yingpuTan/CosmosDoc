@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Cosmos>
+  <!-- app元数据 -->
+  <App>
+    <Version>1.0.0.0</Version>
+    <Base>
+	  <!-- 包id，填入在管理端申请应用是返回的Appid -->
+      <Guid>4bdb5aa3-9081-4918-be2b-09102e6a2615</Guid>
+      <Name>
+        <zh-CN>Cosmos进程demo</zh-CN>
+        <en-US>Cosmos进程demo</en-US>
+      </Name>
+      <Description>
+        <zh-CN>Cosmos进程demo</zh-CN>
+        <en-US>Cosmos进程demo</en-US>
+      </Description>
+    </Base>
+    <!-- widget元数据集 -->
+    <Widgets>
+      <Widget>
+        <Base>
+		  <!-- 组件id，填入在管理端申请应用是添加组件返回的Widgetid -->
+          <Guid>cdf370d9-8a19-4175-9e1e-31511eaa5017</Guid>  
+          <Name>
+            <zh-CN>Cosmos进程demo</zh-CN>
+            <en-US>Cosmos进程demo</en-US>
+          </Name>
+          <Description>
+            <zh-CN>Cosmos进程demo</zh-CN>
+            <en-US>Cosmos进程demo</en-US>
+          </Description>
+        </Base>
+		<Group>trader</Group>
+		<!-- 组件库路径 -->
+        <LibraryFile>Cosmos.App.Hithink.MfcProcessDemo.dll</LibraryFile>
+		<!-- 组件库入口类 -->
+		<RuntimeType>Cosmos.App.Hithink.MfcProcessDemo.MfcProcessDemoGui</RuntimeType>
+        <GuiFrameworks>wpf</GuiFrameworks>
+      </Widget>
+    </Widgets>
+  </App>
+</Cosmos>
+

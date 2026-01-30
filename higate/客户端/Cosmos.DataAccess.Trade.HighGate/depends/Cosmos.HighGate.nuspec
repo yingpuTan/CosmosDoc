@@ -1,0 +1,13 @@
+<package>
+  <metadata>
+    <id>Cosmos.HighGate.Native</id>
+    <version>0.0.58</version>
+    <authors>THS</authors>
+    <owners>THS</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectUrl>https://10jaqka.com.cn/</projectUrl>
+    <description>Cosmos.HighGate.Native</description>
+    <releaseNotes>Cosmos.HighGate.Native</releaseNotes>
+    <copyright>Copyright ©2023 THS Corporation</copyright>
+  </metadata>
+</package>

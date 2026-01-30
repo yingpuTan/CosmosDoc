@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	<Version>0.0.62</Version>
+	<UseWPF>true</UseWPF>
+	<Description>组件demo</Description>
+	<Title>组件demo</Title>
+	<PackageIcon>PackageIcon.png</PackageIcon>
+	<PackageTags>69cc84f4-56d3-4ece-a229-4df73af813a8</PackageTags>
+	<PackageId>69cc84f4-56d3-4ece-a229-4df73af813a8</PackageId>
+	<Configurations>Debug;Release;Publish</Configurations>
+  </PropertyGroup>
+	<!--添加元数据文件到nupkg，组件运行时需要从该文件读取信息-->
+	<ItemGroup>
+		<Content Include="CosmosAppMetadata.xml" />
+	</ItemGroup>
+	<!--添加组件图标，打包nupkg需要-->
+	<ItemGroup>
+		<None Update="PackageIcon.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+	<!--添加cef配置到资源中，cef运行需要从中读取资源-->
+	<ItemGroup>
+		<EmbeddedResource Include="Config.json" />
+	</ItemGroup>
+	<ItemGroup>
+	  <PackageReference Include="Cosmos.App.Sdk" Version="0.0.63" />
+	  <PackageReference Include="Cosmos.App.Sdk.Windows" Version="0.0.63" />
+	  <PackageReference Include="Cosmos.DataAccess" Version="0.0.63" />
+	  <PackageReference Include="Cosmos.DataAccess.Trade" Version="0.0.63" />
+	  <PackageReference Include="Cosmos.DataAccess.Trade.HighGate" Version="0.0.63" />
+	  <PackageReference Include="Cosmos.OsslSignCode.Native" Version="0.0.5" />
+	  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+	</ItemGroup>
+	<ItemGroup>
+		<Content Include="resources\*.*">
+			<Pack>true</Pack>
+			<PackagePath>content\resources\%(FileName)%(Extension)</PackagePath>
+		</Content>
+	</ItemGroup>
+</Project>

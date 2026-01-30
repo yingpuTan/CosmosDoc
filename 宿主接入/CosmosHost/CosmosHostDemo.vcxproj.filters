@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\项目\银河\cosmos资料\1.接入文档 - 信创\宿主接入\CosmosHost\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\项目\银河\cosmos资料\1.接入文档 - 信创\宿主接入\CosmosHost\CCosmosHostApi.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\项目\银河\cosmos资料\1.接入文档 - 信创\宿主接入\CosmosHost\platform.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\项目\银河\cosmos资料\1.接入文档 - 信创\宿主接入\CosmosHost\CCosmosHostApi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\项目\银河\cosmos资料\1.接入文档 - 信创\宿主接入\CosmosHost\platform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\项目\银河\cosmos资料\1.接入文档 - 信创\宿主接入\CosmosHost\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{C1E9A8F6-DDF6-3B27-A16A-4786742F2F73}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{8A13A18E-5A00-3863-A1DB-F2ECF3F4FC91}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

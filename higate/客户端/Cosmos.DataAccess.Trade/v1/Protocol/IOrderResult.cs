@@ -1,0 +1,19 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Cosmos.DataAccess.Trade.v1.Protocol
+{
+    /// <summary>
+    /// 委托应答
+    /// </summary>
+    public interface IOrderResult
+    {
+        /// <summary>
+        /// 合同编号
+        /// </summary>
+        string OrderId { get; set; }
+    }
+}

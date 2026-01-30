@@ -1,0 +1,107 @@
+﻿<UserControl x:Class="Cosmos.App.Hithink.ComDemo.ComDemo"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:Cosmos.App.Hithink.ComDemo"
+             mc:Ignorable="d" 
+             d:DesignHeight="900" d:DesignWidth="1000">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="100"/>
+            <RowDefinition Height="40"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+
+        </Grid.RowDefinitions>
+        <StackPanel Orientation="Horizontal" >
+            <Label Content="测试与Higate通信：" HorizontalAlignment="Left" VerticalAlignment="Center" Width="110"/>
+            <TextBox x:Name="text_higate" HorizontalAlignment="Left"  TextWrapping="Wrap" VerticalAlignment="Center" Width="120"/>
+            <Button x:Name="btn_sub_higate" Content="订阅higate"  Margin="10" VerticalAlignment="Center" AutomationProperties.IsColumnHeader="True" Click="btn_sub_higate_Click"/>
+            <Button x:Name="btn_unsub_higate" Content="取消订阅higate" Margin="10" HorizontalAlignment="Left"  VerticalAlignment="Center" AutomationProperties.IsColumnHeader="True" Click="btn_unsub_higate_Click"/>
+            <Button x:Name="btn_req_higate" Content="请求higate" HorizontalAlignment="Left"  VerticalAlignment="Center" AutomationProperties.IsColumnHeader="True" Click="btn_req_higate_Click"/>
+        </StackPanel>
+
+       
+
+        <Label Content="测试与宿主通信：" HorizontalAlignment="Left" Margin="16,15,0,0" VerticalAlignment="Top" Width="110" Grid.Row="4"/>
+        <TextBox x:Name="text_name" HorizontalAlignment="Left" Margin="128,19,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120" Grid.Row="4"/>
+        <Button x:Name="btn_send_msg" Content="主动发送数据给宿主" HorizontalAlignment="Left" Margin="272,17,0,0" VerticalAlignment="Top" AutomationProperties.IsColumnHeader="True" Click="btn_send_msg_Click" Grid.Row="4"/>
+
+        <Label Content="测试获取行情数据：" HorizontalAlignment="Left" Margin="23,0,0,0" VerticalAlignment="Center" Width="120" Grid.Row="1"/>
+        <Button x:Name="btn_get_selfstock" Grid.Row="1" Content="获取自选股列表" HorizontalAlignment="Left" Margin="160,0,0,0" VerticalAlignment="Center" Click="btn_get_Click" AutomationProperties.IsColumnHeader="True"/>
+        <TextBox x:Name="text_selfstock" Grid.Row="1" HorizontalAlignment="Left" Margin="300,0,0,0" TextWrapping="Wrap" VerticalAlignment="Center" Width="120"/>
+
+        <Label Content="测试与组件引擎交互：" HorizontalAlignment="Left" Margin="23,0,0,0" VerticalAlignment="Center" Width="135" Grid.Row="2"/>
+        <TextBox x:Name="text_hotkey" HorizontalAlignment="Left" Margin="160,13,0,0" Grid.Row="2" TextWrapping="Wrap" VerticalAlignment="Top" Width="110"/>
+        <Button x:Name="btn_registerhotkey" Content="注册快捷键" HorizontalAlignment="Left" Margin="300,0,0,0" Grid.Row="2" VerticalAlignment="Center"  Width="96" Click="Button_Click"/>
+
+        <Label Content="测试获取统一配置：" HorizontalAlignment="Left" Margin="23,0,0,0" VerticalAlignment="Center" Width="135" Grid.Row="3"/>
+        <TextBox x:Name="text_theme" HorizontalAlignment="Left" Margin="160,13,0,0" Grid.Row="3" TextWrapping="Wrap" VerticalAlignment="Top" Width="110"/>
+        <Button x:Name="btn_gettheme" Content="获取当前主题" HorizontalAlignment="Left" Margin="300,0,0,0" Grid.Row="3" VerticalAlignment="Center"  Width="96" Click="btn_gettheme_Click"/>
+        <Button x:Name="btn_getthemedic" Content="获取当前主题皮肤字典" HorizontalAlignment="Left" Margin="420,0,0,0" Grid.Row="3" VerticalAlignment="Center"  Width="96" Click="btn_getthemedic_Click"/>
+
+
+        <Label Width="auto" x:Name="lab_higate" Content="" Grid.Row="4"/>
+
+        <Label Content="测试cef组件：" HorizontalAlignment="Left" Margin="23,0,0,0" VerticalAlignment="Center" Width="110" Grid.Row="5"/>
+        <local:CosmosWebDemo x:Name="web_demo" Grid.Row="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Height="auto"/>
+
+        
+        <Grid Grid.Row="7" Margin="23,10,0,0">
+            <Label Content="开始用户名：" Width="60" HorizontalAlignment="Left"/>
+            <TextBox x:Name="text_Name" Width="110" Margin="70,0,0,0" HorizontalAlignment="Left"/>
+
+            <Label Content="链接个数：" Width="60" Margin="190,0,0,0"  HorizontalAlignment="Left"/>
+            <TextBox x:Name="text_Link" Width="110" Margin="260,0,0,0" HorizontalAlignment="Left"/>
+            <Button x:Name="btn_create" Content="开始连接" HorizontalAlignment="Left" Margin="380,0,0,0" Width="110" Click="btn_create_Click"/>
+            
+            <Button x:Name="btn_req" Content="请求" HorizontalAlignment="Left" Margin="500,0,0,0"  Width="110" Click="btn_req_Click"/>
+            <Button x:Name="btn_sub" Content="订阅" HorizontalAlignment="Left" Margin="620,0,0,0" Width="110" Click="btn_sub_Click"/>
+            <Button x:Name="btn_ubsub" Content="取消订阅" HorizontalAlignment="Left" Margin="740,0,0,0" Width="110" Click="btn_ubsub_Click"/>
+        </Grid>
+        
+        <Grid Grid.Row="8" Margin="23,10,0,0">
+            <Label Content="发送内容：" Width="60" HorizontalAlignment="Left"/>
+            <TextBox x:Name="text_sendcom" Width="110" Margin="70,0,0,0" HorizontalAlignment="Left"/>
+
+            <Label Content="发送组：" Width="60" Margin="190,0,0,0" HorizontalAlignment="Left"/>
+            <TextBox x:Name="text_sender" Width="110" Margin="260,0,0,0" HorizontalAlignment="Left"/>
+            <ComboBox x:Name="comuType" HorizontalAlignment="Left" Margin="377,1,0,0"  Width="120" SelectedIndex="0" SelectionChanged="comuType_SelectionChanged">
+                <ComboBoxItem Content="请求" />
+                <ComboBoxItem Content="通知"/>
+            </ComboBox>
+            <Button x:Name="btn_sendcom" Content="发送给某组组件" HorizontalAlignment="Left" Margin="620,0,0,0" Width="110" Click="btn_sendcom_Click"/>
+            <Button x:Name="btn_sendglobal" Content="发送给所有组件" HorizontalAlignment="Left" Margin="500,0,0,0"  Width="110" Click="btn_sendglobal_Click"/>
+            <Button x:Name="btn_sendinstance" Content="通知具体组件"  HorizontalAlignment="Left" Margin="740,0,0,0" Width="110" Click="btn_sendinstance_Click" Visibility="Hidden"/>
+        </Grid>
+        <Grid Grid.Row="9" Margin="23,0,0,0">
+            <StackPanel Orientation="Horizontal">
+                <CheckBox x:Name="check_timer" Content="启动定时器" VerticalAlignment="Center" Checked="check_timer_Checked"/>
+                <Label Content="定时间隔" Margin="20,0,10,0" ToolTip="默认间隔1s" />
+                <TextBox x:Name="timer_interval" Width="80"  Text="1000"  VerticalAlignment="Center"/>
+                <Label Content="ms" />
+                <Label Content="发送次数" Margin="20,0,10,0" ToolTip="默认间隔1s" />
+                <TextBox x:Name="total_count" Width="80"  Text="5000"  VerticalAlignment="Center"/>
+                <Label Content="次" />
+                <CheckBox x:Name="check_send_type" Content="广播" VerticalAlignment="Center" Margin="20,0,10,0" Checked="check_send_type_Checked" Width="51"/>
+            </StackPanel>   
+
+        </Grid>
+        <Grid Grid.Row="10" Margin="23,0,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="234*"/>
+                <ColumnDefinition Width="743*"/>
+            </Grid.ColumnDefinitions>
+            <Label Content="接收内容：" Width="60" HorizontalAlignment="Left"/>
+            <RichTextBox x:Name="text_receive" Width="658"  Height="100" Margin="70,0,0,0" HorizontalAlignment="Left" Grid.ColumnSpan="2"/>
+        </Grid>
+    </Grid>
+</UserControl>

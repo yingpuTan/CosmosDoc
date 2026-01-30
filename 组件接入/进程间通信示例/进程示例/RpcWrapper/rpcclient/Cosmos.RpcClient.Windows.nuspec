@@ -1,0 +1,13 @@
+<package>
+  <metadata>
+    <id>Cosmos.RpcClient.Windows</id>
+    <version>0.0.14</version>
+    <authors>THS</authors>
+    <owners>THS</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectUrl>https://10jaqka.com.cn/</projectUrl>
+    <description>Cosmos.RpcClient.Windows</description>
+    <releaseNotes>Cosmos.RpcClient.Windows</releaseNotes>
+    <copyright>Copyright ©2023 THS Corporation</copyright>
+  </metadata>
+</package>
