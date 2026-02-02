@@ -1,42 +1,38 @@
-﻿#if WPF
+#if AVALONIA
 using System;
-using System.Drawing;
-using System.Windows;
-using System.Windows.Shapes;
+using System.Runtime.InteropServices;
 using Cosmos.App.Sdk.v1;
 using Cosmos.App.Sdk.Windows;
-using System.Reflection;
-using System.IO;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using Path = System.IO.Path;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Text.Json.Nodes;
-using System.Text.Json;
-using System.Windows.Media;
-using System.ComponentModel;
-using Microsoft.Win32;
 using Cosmos.App.Hithink.ProcessDemo.Shared;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Platform;
 
-namespace Cosmos.App.Hithink.WpfProcessDemo
+namespace Cosmos.App.Hithink.AvaloniaProcessDemo
 {
-    public class WpfProcessDemoGui :
-        WpfCosmosAppProcessWidget //进程间通讯基类，并且需要实现类中提供的抽象方法
+    public class AvaloniaProcessDemoGui :
+        WpfCosmosAppProcessWidget //进程间通讯基类，假设Avalonia也使用相同的基类或需要适配
     {
         private ProcessDemoGuiBase _baseImpl;
+        private NativeControlHost _nativeHost;
+        private double _dpiRatioFirst = 1;
+        private double _previousDpiScale = 1.0;
 
-        public WpfProcessDemoGui()
+        public AvaloniaProcessDemoGui()
         {
-            _wfh = new WpfCosmosHwndHost();
-            _wfh.Margin = new Thickness(0, 0, 0, 0);
-            /// 设置大小改变事件
-            _wfh.SizeChanged += _wfh_SizeChanged;
-            SystemParameters.StaticPropertyChanged += SystemParameters_StaticPropertyChanged;
-
-            /// 设置窗口加载成功事件
-            _wfh.Loaded += _wfh_Loaded;
-            Content = _wfh;
+            _nativeHost = new NativeControlHost();
+            _nativeHost.Margin = new Thickness(0);
+            
+            // 设置大小改变事件
+            _nativeHost.SizeChanged += NativeHost_SizeChanged;
+            
+            // 设置窗口加载成功事件
+            _nativeHost.AttachedToVisualTree += NativeHost_AttachedToVisualTree;
+            
+            Content = _nativeHost;
 
             _baseImpl = new ProcessDemoGuiBase();
             InitializeBaseImpl();
@@ -45,15 +41,15 @@ namespace Cosmos.App.Hithink.WpfProcessDemo
         private void InitializeBaseImpl()
         {
             _baseImpl._widgetInstance = this;
-            _baseImpl.GetWindowHandle = () => _wfh.Handle;
-            _baseImpl.GetPhysicalWidth = () => _wfh.PhysicalWidth;
-            _baseImpl.GetPhysicalHeight = () => _wfh.PhysicalHeight;
-            _baseImpl.GetCurrentDpiScale = () => VisualTreeHelper.GetDpi(this).DpiScaleX;
-            _baseImpl.GetPreviousDpiScale = () => _previousDpi.DpiScaleX;
-            _baseImpl.SetPreviousDpiScale = (scale) => _previousDpi = new DpiScale(scale, scale);
+            _baseImpl.GetWindowHandle = () => GetWindowHandle();
+            _baseImpl.GetPhysicalWidth = () => _nativeHost.Bounds.Width;
+            _baseImpl.GetPhysicalHeight = () => _nativeHost.Bounds.Height;
+            _baseImpl.GetCurrentDpiScale = () => GetCurrentDpiScale();
+            _baseImpl.GetPreviousDpiScale = () => _previousDpiScale;
+            _baseImpl.SetPreviousDpiScale = (scale) => _previousDpiScale = scale;
             _baseImpl.SetFirstDpiRatio = (ratio) => _dpiRatioFirst = ratio;
             _baseImpl.GetFirstDpiRatio = () => _dpiRatioFirst;
-            _baseImpl.InvokeOnMainThread = (action) => Dispatcher.InvokeAsync(action);
+            _baseImpl.InvokeOnMainThread = (action) => Avalonia.Threading.Dispatcher.UIThread.Post(action);
             _baseImpl.CreateRpcRequest = () => CreateRpcRequest();
             _baseImpl.CreateRpcResponse = () => CreateRpcResponse();
             _baseImpl.CreateRpcManager = (clientDir, strCmd, logger) => CreateRpcManager(clientDir, strCmd, logger);
@@ -63,29 +59,41 @@ namespace Cosmos.App.Hithink.WpfProcessDemo
             _baseImpl.ChangeProcessWindowSize = () => ChangeProcessWindowSize();
         }
 
-        WpfCosmosHwndHost _wfh { get; set; }
-        private void _wfh_Loaded(object sender, RoutedEventArgs e)
+        private IntPtr GetWindowHandle()
         {
-            _logger?.Log(CosmosLogLevel.Information, "Wfh_Loaded");
+            // 获取 Avalonia 窗口句柄
+            if (this.GetVisualRoot() is Window window)
+            {
+                var platformHandle = window.PlatformImpl?.Handle;
+                if (platformHandle is IPlatformHandle handle)
+                {
+                    return handle.Handle;
+                }
+            }
+            return IntPtr.Zero;
+        }
+
+        private double GetCurrentDpiScale()
+        {
+            // 获取 Avalonia DPI 缩放比例
+            if (this.GetVisualRoot() is Window window)
+            {
+                return window.RenderScaling;
+            }
+            return 1.0;
+        }
+
+        private void NativeHost_AttachedToVisualTree(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
+        {
+            _logger?.Log(CosmosLogLevel.Information, "NativeHost_AttachedToVisualTree");
 
             //窗口创建成功、可以启动进程通信服务
             _baseImpl.StartRpcServer();
         }
 
-        private void _wfh_SizeChanged(object sender, SizeChangedEventArgs e)
+        private void NativeHost_SizeChanged(object? sender, SizeChangedEventArgs e)
         {
             ChangeProcessWindowSize();
-        }
-
-        private void SystemParameters_StaticPropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            var currentDpi = VisualTreeHelper.GetDpi(this);
-            _logger.Log(CosmosLogLevel.Information, "SystemParameters_StaticPropertyChanged");
-            if (currentDpi.DpiScaleX != _previousDpi.DpiScaleX)
-            {
-                _previousDpi = currentDpi;
-                ChangeProcessWindowSize();
-            }
         }
 
         private void ChangeProcessWindowSize()
@@ -93,21 +101,21 @@ namespace Cosmos.App.Hithink.WpfProcessDemo
             try
             {
                 //切换到主线程获取窗口大小
-                Dispatcher.InvokeAsync(() =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     //窗口发生变化、通知进程需要调整窗口大小
                     //组装调整大小命令、进程按照该组装方式进行解析
-                    var graphics = VisualTreeHelper.GetDpi(this);
+                    var currentDpi = GetCurrentDpiScale();
                     ICosmosRpcRequest request = CreateRpcRequest();
                     request.id = Guid.NewGuid().ToString();
                     request.method = "setsize";
                     request.param = new JObject
                     {
-                        ["width"] = _wfh.PhysicalWidth,
-                        ["height"] = _wfh.PhysicalHeight,
+                        ["width"] = _nativeHost.Bounds.Width,
+                        ["height"] = _nativeHost.Bounds.Height,
                         ["dpiRatio"] = _dpiRatioFirst,
-                        ["curscaling"] = graphics.DpiScaleX,
-                        ["prescaling"] = _previousDpi.DpiScaleX
+                        ["curscaling"] = currentDpi,
+                        ["prescaling"] = _previousDpiScale
                     };
 
                     ProcessDemoGuiBase.g_mapRequest[request.id] = request;
@@ -234,13 +242,7 @@ namespace Cosmos.App.Hithink.WpfProcessDemo
             _baseImpl.HandleSubscribe(data);
         }
         #endregion
-
-        #region WPF 特定的实现
-
-        public double _dpiRatioFirst = 1;
-        private DpiScale _previousDpi;
-
-        #endregion
     }
 }
 #endif
+

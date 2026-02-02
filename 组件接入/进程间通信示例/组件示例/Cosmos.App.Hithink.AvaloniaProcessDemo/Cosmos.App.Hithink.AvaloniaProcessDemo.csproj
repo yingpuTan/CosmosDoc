@@ -1,18 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0-windows</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<Version>0.0.62</Version>
-	<UseWPF>true</UseWPF>
-	<Description>WPF进程demo</Description>
-	<Title>WPF进程demo</Title>
+	<Description>Avalonia进程demo</Description>
+	<Title>Avalonia进程demo</Title>
 	<PackageIcon>PackageIcon.png</PackageIcon>
-	<PackageTags>2a596dc9-6f3e-4ed2-8c33-c2f4aa9309bb</PackageTags>
-	<PackageId>2a596dc9-6f3e-4ed2-8c33-c2f4aa9309bb</PackageId>
+	<PackageTags>avalonia-process-demo</PackageTags>
+	<PackageId>Cosmos.App.Hithink.AvaloniaProcessDemo</PackageId>
 	<Configurations>Debug;Release;Publish</Configurations>
-	<DefineConstants>WPF</DefineConstants>
+	<DefineConstants>AVALONIA</DefineConstants>
   </PropertyGroup>
 	<!--添加元数据文件到nupkg，组件运行时需要从该文件读取信息-->
 	<ItemGroup>
@@ -29,6 +28,7 @@
 	  <PackageReference Include="Cosmos.OsslSignCode.Native" Version="0.0.5" />
 	  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 	  <PackageReference Include="System.Drawing.Common" Version="5.0.0" />
+	  <PackageReference Include="Avalonia" Version="11.0.0" />
 	</ItemGroup>
 	<ItemGroup>
 		<Content Include="dependents\*.*">
@@ -42,3 +42,4 @@
 	  <ProjectReference Include="..\Cosmos.App.Hithink.ProcessDemo.Shared\Cosmos.App.Hithink.ProcessDemo.Shared.csproj" />
 	</ItemGroup>
 </Project>
+
