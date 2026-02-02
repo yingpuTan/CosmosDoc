@@ -1,6 +1,7 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "pch.h"
 
+#ifdef _WIN32
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
                        LPVOID lpReserved
@@ -16,4 +17,16 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     }
     return TRUE;
 }
+#else
+// Linux shared library constructor/destructor
+__attribute__((constructor))
+void library_init() {
+    // Library initialization code if needed
+}
+
+__attribute__((destructor))
+void library_cleanup() {
+    // Library cleanup code if needed
+}
+#endif
 

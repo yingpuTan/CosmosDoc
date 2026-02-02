@@ -6,7 +6,30 @@
 #include <Windows.h>
 #include <objbase.h>
 #else
-#include <uuid/uuid.h>
+// Check if USE_UUID_LIB is defined by CMake, otherwise try to detect
+#ifndef USE_UUID_LIB
+    #ifdef __has_include
+        #if __has_include(<uuid/uuid.h>)
+            #include <uuid/uuid.h>
+            #define USE_UUID_LIB 1
+        #else
+            #define USE_UUID_LIB 0
+        #endif
+    #else
+        // Try to include, will fail if not available (install: sudo apt-get install uuid-dev)
+        #include <uuid/uuid.h>
+        #define USE_UUID_LIB 1
+    #endif
+#elif USE_UUID_LIB == 1
+    #include <uuid/uuid.h>
+#else
+    // USE_UUID_LIB == 0, use fallback
+#endif
+// Include headers needed for fallback implementation
+#if USE_UUID_LIB == 0
+    #include <random>
+    #include <sstream>
+#endif
 #endif
 
 #include <string>
@@ -16,6 +39,22 @@
 #include <iomanip>
 #include <chrono>
 #include <regex>
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
+#include <map>
+#include <sstream>
+#include <cstdlib>
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include <sys/stat.h>
+#include <dirent.h>
+#include <unistd.h>
+#include <cstring>
+#endif
 
 namespace app
 {
@@ -63,12 +102,44 @@ namespace app
 #else
     inline std::string GetUuid()
     {
-        // Linux返回标准UUID
+#if defined(USE_UUID_LIB) && USE_UUID_LIB == 1
+        // Linux返回标准UUID (使用uuid库)
         uuid_t uu;
         uuid_generate(uu);
         char uuid_str[37];
         uuid_unparse_lower(uu,uuid_str);
         return uuid_str;
+#else
+        // 回退实现：使用随机数生成UUID v4格式
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        static std::uniform_int_distribution<> dis(0, 15);
+        static std::uniform_int_distribution<> dis2(8, 11);
+        
+        std::stringstream ss;
+        ss << std::hex;
+        for (int i = 0; i < 8; i++) {
+            ss << dis(gen);
+        }
+        ss << "-";
+        for (int i = 0; i < 4; i++) {
+            ss << dis(gen);
+        }
+        ss << "-4";
+        for (int i = 0; i < 3; i++) {
+            ss << dis(gen);
+        }
+        ss << "-";
+        ss << dis2(gen);
+        for (int i = 0; i < 3; i++) {
+            ss << dis(gen);
+        }
+        ss << "-";
+        for (int i = 0; i < 12; i++) {
+            ss << dis(gen);
+        }
+        return ss.str();
+#endif
     }
 #endif
 
@@ -97,9 +168,14 @@ namespace app
 
     std::string GetSysWorkDir()
     {
+#ifdef _WIN32
         static char g_szWorkDir[MAX_PATH] = { 0 };
+#else
+        static char g_szWorkDir[PATH_MAX] = { 0 };
+#endif
         if (g_szWorkDir[0] == '\0')
         {
+#ifdef _WIN32
             DWORD dwSize = GetModuleFileNameA(NULL, g_szWorkDir, MAX_PATH);
             for (int i = dwSize - 1; i >= 0; --i)
             {
@@ -109,6 +185,31 @@ namespace app
                     break;
                 }
             }
+#else
+            ssize_t len = readlink("/proc/self/exe", g_szWorkDir, PATH_MAX - 1);
+            if (len != -1)
+            {
+                g_szWorkDir[len] = '\0';
+                for (int i = len - 1; i >= 0; --i)
+                {
+                    if (g_szWorkDir[i] == '/')
+                    {
+                        g_szWorkDir[i + 1] = '\0';
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                // Fallback to current directory
+                if (getcwd(g_szWorkDir, PATH_MAX) == nullptr)
+                {
+                    g_szWorkDir[0] = '.';
+                    g_szWorkDir[1] = '/';
+                    g_szWorkDir[2] = '\0';
+                }
+            }
+#endif
         }
         return g_szWorkDir;
     }
@@ -152,13 +253,26 @@ namespace app
         std::string stem = filename.substr(0, dotPos);
         std::string extension = filename.substr(dotPos);
 
+#ifdef _WIN32
         SYSTEMTIME tm = {};
         GetLocalTime(&tm);
         std::string strDate = Format("_%04d%02d%02d", tm.wYear, tm.wMonth, tm.wDay);
+#else
+        time_t now = time(nullptr);
+        struct tm* tm_info = localtime(&now);
+        std::string strDate = Format("_%04d%02d%02d", 
+            tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday);
+#endif
         std::string newFilename = stem + strDate + extension;
 
         std::string parentPath = extractParentPath(fullPath);
+#ifdef _WIN32
         CreateDirectoryA(parentPath.c_str(), nullptr);
+#else
+        // Create directory recursively on Linux
+        std::string cmd = "mkdir -p " + parentPath;
+        system(cmd.c_str());
+#endif
         return parentPath + newFilename;
     }
     uint64_t GetTime() {
@@ -169,6 +283,7 @@ namespace app
 
     int getLastFileCounter(const std::string& strFolder)
     {
+#ifdef _WIN32
         SYSTEMTIME tm = {};
         GetLocalTime(&tm);
         std::string strDate = app::Format("%4d%02d%02d", tm.wYear, tm.wMonth, tm.wDay);
@@ -217,6 +332,51 @@ namespace app
         FindClose(hFindFile);
 
         return iDexMax;
+#else
+        time_t now = time(nullptr);
+        struct tm* tm_info = localtime(&now);
+        std::string strDate = app::Format("%4d%02d%02d", 
+            tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday);
+
+        std::string strCurrentPath = strFolder;
+        size_t lastSlashPos = strFolder.find_last_of("\\/");
+        if (lastSlashPos != std::string::npos) {
+            strCurrentPath = strFolder.substr(0, lastSlashPos + 1);
+        }
+
+        int iDexMax = 0;
+        DIR* dir = opendir(strCurrentPath.c_str());
+        if (dir != nullptr) {
+            struct dirent* entry;
+            while ((entry = readdir(dir)) != nullptr) {
+                std::string strFileNames = entry->d_name;
+                size_t pos = strFileNames.find(strDate);
+                if (pos != std::string::npos) {
+                    struct stat fileStat;
+                    std::string fullPath = strCurrentPath + strFileNames;
+                    if (stat(fullPath.c_str(), &fileStat) == 0) {
+                        if (S_ISDIR(fileStat.st_mode)) {
+                            continue;
+                        }
+                    }
+
+                    // 提取序号部分
+                    std::regex pattern(R"(.*\d{8}_(\d{3})\.log)");
+                    std::smatch matches;
+
+                    if (std::regex_match(strFileNames, matches, pattern)) {
+                        std::string index = matches[1].str();
+                        if (iDexMax < atoi(index.c_str())) {
+                            iDexMax = atoi(index.c_str());
+                        }
+                    }
+                }
+            }
+            closedir(dir);
+        }
+
+        return iDexMax;
+#endif
     }
 
     // 线程安全的日志队列
@@ -478,8 +638,13 @@ namespace app
         std::mutex g_fileCounterMutex;
         std::map<std::string, int> g_fileCounterMap;
 
+#ifdef _WIN32
         __int64 _login = 0;
         __int64 _logout = 0;
+#else
+        int64_t _login = 0;
+        int64_t _logout = 0;
+#endif
         std::string _strBasename;   // 基础日志文件名
         const size_t maxFileSize = 50 * 1024 * 1024; // 50MB
     };  
@@ -504,18 +669,38 @@ namespace app
         vsnprintf((char*)strResult.data(), buffer_size + 1, szFormat, ap);
         va_end(ap);
 
+#ifdef _WIN32
         SYSTEMTIME tm = {};
         GetLocalTime(&tm);
         std::string log = app::Format("%4d%02d%02d %02d:%02d:%02d:%03d %s",
             tm.wYear, tm.wMonth, tm.wDay, tm.wHour, tm.wMinute, tm.wSecond, tm.wMilliseconds, strResult.c_str());
+#else
+        time_t now = time(nullptr);
+        struct tm* tm_info = localtime(&now);
+        auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count() % 1000;
+        std::string log = app::Format("%4d%02d%02d %02d:%02d:%02d:%03ld %s",
+            tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday,
+            tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec, now_ms, strResult.c_str());
+#endif
 
         // 将日志消息推入队列
         g_logQueue.push(std::move(log));
     }
 
+#ifdef _WIN32
     using TraverseCallback = std::function<bool(const std::string&, const WIN32_FIND_DATAA&)>;
+#else
+    struct FileInfo {
+        std::string fileName;
+        bool isDirectory;
+    };
+    using TraverseCallback = std::function<bool(const std::string&, const FileInfo&)>;
+#endif
+
     void Traverse(const std::string& strBasePath, bool bRecursive, TraverseCallback fnCallback)
     {
+#ifdef _WIN32
         std::queue<std::string> queueDir;
         queueDir.push(strBasePath);
 
@@ -557,10 +742,67 @@ namespace app
 
             FindClose(hFindFile);
         }
+#else
+        std::queue<std::string> queueDir;
+        queueDir.push(strBasePath);
+
+        while (!queueDir.empty())
+        {
+            std::string strCurrentPath = queueDir.front();
+            if (strCurrentPath.back() != '/') {
+                strCurrentPath += "/";
+            }
+            queueDir.pop();
+
+            DIR* dir = opendir(strCurrentPath.c_str());
+            if (dir == nullptr) {
+                continue;
+            }
+
+            struct dirent* entry;
+            while ((entry = readdir(dir)) != nullptr)
+            {
+                std::string strFileNames = entry->d_name;
+                if (strFileNames == "." || strFileNames == "..")
+                {
+                    continue;
+                }
+
+                std::string fullPath = strCurrentPath + strFileNames;
+                struct stat fileStat;
+                bool bIsDirs = false;
+                if (stat(fullPath.c_str(), &fileStat) == 0) {
+                    bIsDirs = S_ISDIR(fileStat.st_mode);
+                }
+
+                if (bIsDirs && bRecursive)
+                {
+                    queueDir.push(fullPath);
+                }
+
+                if (bIsDirs)
+                {
+                    continue;
+                }
+
+                FileInfo fileInfo;
+                fileInfo.fileName = strFileNames;
+                fileInfo.isDirectory = bIsDirs;
+                if (!fnCallback(fullPath, fileInfo))
+                {
+                    closedir(dir);
+                    return;
+                }
+            }
+
+            closedir(dir);
+        }
+#endif
     }
 
     time_t GetFileCreateTime(const std::string& strFileName)
     {
+#ifdef _WIN32
         FILETIME ft = {};
         HANDLE hFile = CreateFileA(strFileName.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 
@@ -580,15 +822,27 @@ namespace app
 
         time_t t = (LONGLONG)(uli.QuadPart - 116444736000000000ull) / 10000000ull;
         return t;
+#else
+        struct stat fileStat;
+        if (stat(strFileName.c_str(), &fileStat) == 0) {
+            return fileStat.st_ctime;
+        }
+        return 0;
+#endif
     }
 
     bool Delete(const std::string& strFileName)
     {
+#ifdef _WIN32
         return DeleteFileA(strFileName.c_str());
+#else
+        return unlink(strFileName.c_str()) == 0;
+#endif
     }
 
     int CleanLogFile(const std::string& strFolder, const double& DayCycle)
     {
+#ifdef _WIN32
         Traverse(strFolder, true, [&](const std::string& strFullPath,
             const WIN32_FIND_DATAA& findData) -> bool {
                 time_t creationTime = GetFileCreateTime(strFullPath);
@@ -601,6 +855,20 @@ namespace app
                 }
                 return true;
             });
+#else
+        Traverse(strFolder, true, [&](const std::string& strFullPath,
+            const FileInfo& findData) -> bool {
+                time_t creationTime = GetFileCreateTime(strFullPath);
+                time_t now = time(NULL);
+                time_t deadline = now - time_t(DayCycle * 24 * 60 * 60);
+
+                if (creationTime < deadline)
+                {
+                    Delete(strFullPath);
+                }
+                return true;
+            });
+#endif
         return 0;
     }    
 }

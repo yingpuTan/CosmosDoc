@@ -1,5 +1,5 @@
 #pragma once
-#include <windows.h>
+#include "framework.h"
 #include <string>
 #include <map>
 #include <mutex>
@@ -7,7 +7,14 @@
 #include <future>
 #include <queue>
 #include <atomic>
+#include <thread>
 #include "jsonCpp/json.h"
+
+#ifdef _WIN32
+#define INVALID_PIPE_HANDLE INVALID_HANDLE_VALUE
+#else
+#define INVALID_PIPE_HANDLE -1
+#endif
 
 #ifdef _WIN32
 #define API_EXPORT __declspec(dllexport)
@@ -74,12 +81,18 @@ extern "C" {
 		Global
 	};
 
-	typedef void*(__cdecl*OnInvoke)(void* _in, int size);
-	typedef void(__cdecl* OnNotify)(void* _in, int size);
-	typedef void(__cdecl* OnSubscribe)(void* _in, int size);
-	typedef void(__cdecl* OnPush)(void* _in, int size);
-	typedef void(__cdecl* OnFreeVoidPtr)(void* _in);
-	typedef void(__cdecl  InvokeCallback)(RET_CALL, void*, int);
+#ifdef _WIN32
+	#define CDECL_CALL __cdecl
+#else
+	#define CDECL_CALL
+#endif
+
+	typedef void*(CDECL_CALL* OnInvoke)(void* _in, int size);
+	typedef void(CDECL_CALL* OnNotify)(void* _in, int size);
+	typedef void(CDECL_CALL* OnSubscribe)(void* _in, int size);
+	typedef void(CDECL_CALL* OnPush)(void* _in, int size);
+	typedef void(CDECL_CALL* OnFreeVoidPtr)(void* _in);
+	typedef void(CDECL_CALL  InvokeCallback)(RET_CALL, void*, int);
 
 	API_EXPORT bool      InitClient(const char* in_msg, int size, const char* log_path, int log_path_size, int protocol_level = 1, 
 		                            double del_log_cycle = 3.0, bool bdetaillog = false);
@@ -134,7 +147,11 @@ private:
 	void operator=(const PipeClient&) = delete;
 
 private:
+#ifdef _WIN32
 	HANDLE            _pipeHandle = INVALID_HANDLE_VALUE;
+#else
+	int              _pipeHandle = INVALID_PIPE_HANDLE;
+#endif
 	std::string       _pipeName;
 	std::mutex        _pipeMutex;
 	std::atomic<bool> _connected{false};

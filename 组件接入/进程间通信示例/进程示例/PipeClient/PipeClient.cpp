@@ -29,9 +29,6 @@ static PipeClient* s_pipeClient       = nullptr;
 static int         s_protocol_level   = 1;
 static bool        s_detaillog        = false;
 static double      s_delete_log_cycle = 3.0f;
-
-DWORD dwOutBufferSize = 0;
-DWORD dwInBufferSize = 0;
 void TimerThread(const std::string& strPath, double delete_log_cycle) {
 	// 定义定时器周期（25分钟）
 	std::chrono::minutes interval(25);
@@ -49,15 +46,27 @@ void TimerThread(const std::string& strPath, double delete_log_cycle) {
 	}
 }
 
-PipeClient::PipeClient(const std::string& pipeName, const std::string& logfile) : _pipeName(R"(\\.\pipe\)" + pipeName), _bRelease(false)
+PipeClient::PipeClient(const std::string& pipeName, const std::string& logfile) : _bRelease(false)
 {
-	std::string log_file = app::addTimestampToFilename(logfile);
-	app::g_logQueue.set_basefile(log_file);	
+#ifdef _WIN32
+    _pipeName = R"(\\.\pipe\)" + pipeName;
+#else
+    // Unix Domain Socket path (compatible with C# NamedPipeServerStream)
+    // C# NamedPipeServerStream on Linux uses Unix Domain Socket
+    // If pipeName doesn't contain '/', it's just a name, we'll handle it in Connect()
+    if (pipeName.find('/') == std::string::npos) {
+        _pipeName = pipeName;  // Store as-is, Connect() will prepend /tmp/ if needed
+    } else {
+        _pipeName = pipeName;  // Full path provided
+    }
+#endif
+    std::string log_file = app::addTimestampToFilename(logfile);
+    app::g_logQueue.set_basefile(log_file);	
 
-	// 启动定时器线程
-	std::string parentPath = app::extractParentPath(logfile);
-	std::thread timer_thread(TimerThread, parentPath, s_delete_log_cycle);
-	timer_thread.detach();
+    // 启动定时器线程
+    std::string parentPath = app::extractParentPath(logfile);
+    std::thread timer_thread(TimerThread, parentPath, s_delete_log_cycle);
+    timer_thread.detach();
 }
 
 PipeClient::~PipeClient()
@@ -85,11 +94,12 @@ bool PipeClient::Connect()
 {
 	std::lock_guard<std::mutex> lock(_pipeMutex);
 
-	if (_pipeHandle != INVALID_HANDLE_VALUE)
+	if (_pipeHandle != INVALID_PIPE_HANDLE)
 	{
 		Disconnect();
 	}
 
+#ifdef _WIN32
 	_pipeHandle = CreateFileA(
 		_pipeName.c_str(),
 		GENERIC_READ | GENERIC_WRITE,
@@ -115,6 +125,48 @@ bool PipeClient::Connect()
 		_pipeHandle = INVALID_HANDLE_VALUE;
 		return false;
 	}
+#else
+	// Linux Unix Domain Socket connection (compatible with C# NamedPipeServerStream)
+	_pipeHandle = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (_pipeHandle == INVALID_PIPE_HANDLE)
+	{
+		int err = errno;
+		app::RecordInfo("Err-connect socket failed errcode: %d  pipename: %s", err, _pipeName.c_str());
+		return false;
+	}
+
+	struct sockaddr_un addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	
+	// Handle pipe name format: C# (.NET 7) may use just the name or full path
+	std::string socketPath = _pipeName;
+	if (socketPath.find('/') == std::string::npos) {
+		// If no path separator, assume it's just a name
+		// .NET 7 NamedPipeServerStream on Linux creates socket files like:
+		// /tmp/.NET-Core-Pipe-{name}-{pid}-{random} or /tmp/{name}
+		// Try /tmp/{name} first (simpler format)
+		socketPath = "/tmp/" + socketPath;
+	}
+	
+	// .NET 7 NamedPipeServerStream on Linux creates socket files with specific naming
+	// The actual socket file might be: /tmp/.NET-Core-Pipe-{name}-{pid}-{random}
+	// But when connecting, we can use the simple name and let the system resolve it
+	// If connection fails, the user should check the actual socket file path
+	strncpy(addr.sun_path, socketPath.c_str(), sizeof(addr.sun_path) - 1);
+	addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
+
+	if (connect(_pipeHandle, (struct sockaddr*)&addr, sizeof(addr)) == -1)
+	{
+		int err = errno;
+		app::RecordInfo("Err-connect failed errcode: %d  pipename: %s (tried: %s)", err, _pipeName.c_str(), socketPath.c_str());
+		close(_pipeHandle);
+		_pipeHandle = INVALID_PIPE_HANDLE;
+		return false;
+	}
+
+	app::RecordInfo("Info-connect success pipename: %s (socket: %s)", _pipeName.c_str(), socketPath.c_str());
+#endif
 
 	_connected  = true;
 	_stopRead   = false;
@@ -132,21 +184,29 @@ void PipeClient::Disconnect()
 	_stopRead  = true;
 	_connected = false;
 
-	if (_pipeHandle != INVALID_HANDLE_VALUE)
+	if (_pipeHandle != INVALID_PIPE_HANDLE)
 	{
+#ifdef _WIN32
 		// 取消所有未完成的异步 I/O 操作
 		CancelIoEx(_pipeHandle, nullptr);
-
 		CloseHandle(_pipeHandle);
-		_pipeHandle = INVALID_HANDLE_VALUE;
+#else
+		// Close Linux Unix Domain Socket
+		shutdown(_pipeHandle, SHUT_RDWR);
+		close(_pipeHandle);
+#endif
+		_pipeHandle = INVALID_PIPE_HANDLE;
 	}
 }
 
 bool PipeClient::Isconnected()
 {
 	std::lock_guard<std::mutex> lock(_pipeMutex);
-
+#ifdef _WIN32
 	return _connected;
+#else
+	return _connected && _pipeHandle != INVALID_PIPE_HANDLE;
+#endif
 }
 
 void PipeClient::RecieveLoop()
@@ -157,10 +217,10 @@ void PipeClient::RecieveLoop()
 		// 协议格式："方法（4位）|data长度（8位）|预留符（12位）|uuid（36位，包含-）|数据"
 		// 示例："INVK|00000013|000000000000|d736df35-3d89-4cc8-8520-d6789cc49bd3|msgfromserver"
 
-
 		try
 		{
 			std::string action, uuid, msg, header;
+#ifdef _WIN32
 			{
 				OVERLAPPED over = { 0 };
 				over.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -266,6 +326,122 @@ void PipeClient::RecieveLoop()
 
 				CloseHandle(over.hEvent);
 			}
+#else
+			{
+				char buffer[HEADER_SIZE + 1];
+				ssize_t bytesRead = 0;
+				size_t totalRead = 0;
+
+				// 读取消息头
+				while (totalRead < HEADER_SIZE && !_stopRead)
+				{
+					bytesRead = read(_pipeHandle, buffer + totalRead, HEADER_SIZE - totalRead);
+					if (bytesRead <= 0)
+					{
+						if (errno == EINTR) {
+							continue;
+						}
+						if (bytesRead == 0)
+						{
+							// EOF - pipe closed
+							if (!_stopRead)
+							{
+								app::RecordInfo("Err-recv head pipe closed (EOF)");
+							}
+							close(_pipeHandle);
+							_pipeHandle = INVALID_PIPE_HANDLE;
+							return;
+						}
+						if (!_stopRead)
+						{
+							app::RecordInfo("Err-recv head failed errcode: %d", errno);
+						}
+						if (errno == EPIPE || errno == ECONNRESET)
+						{
+							// Broken pipe or connection reset (Unix Domain Socket)
+							close(_pipeHandle);
+							_pipeHandle = INVALID_PIPE_HANDLE;
+							return;
+						}
+						return;
+					}
+					totalRead += bytesRead;
+				}
+
+				if (_stopRead) {
+					return;
+				}
+
+				buffer[HEADER_SIZE] = '\0';
+				header = std::string(buffer, HEADER_SIZE);
+
+				if (header.size() == HEADER_SIZE)
+				{
+					// 解析消息头
+					action = header.substr(0, ACTION_SIZE);
+					std::string strdataLength = header.substr(ACTION_SIZE + 1, LENGTH_SIZE);
+					int dataLength = std::stoi(strdataLength);
+					std::string pre = header.substr(ACTION_SIZE + LENGTH_SIZE + 2, PRE_SIZE);
+					uuid = header.substr(ACTION_SIZE + LENGTH_SIZE + PRE_SIZE + 3, UUID_SIZE);
+
+					// 读取消息体
+					char* charData = new char[dataLength + 1];
+					totalRead = 0;
+					while (totalRead < dataLength && !_stopRead)
+					{
+						bytesRead = read(_pipeHandle, charData + totalRead, dataLength - totalRead);
+						if (bytesRead <= 0)
+						{
+							if (errno == EINTR) {
+								continue;
+							}
+							if (bytesRead == 0)
+							{
+								// EOF - pipe closed
+								if (!_stopRead)
+								{
+									app::RecordInfo("Err-recv msg pipe closed (EOF)");
+								}
+								delete[] charData;
+								close(_pipeHandle);
+								_pipeHandle = INVALID_PIPE_HANDLE;
+								return;
+							}
+							if (!_stopRead)
+							{
+								app::RecordInfo("Err-recv msg failed errcode: %d", errno);
+							}
+							if (errno == EPIPE || errno == ECONNRESET)
+							{
+								// Broken pipe or connection reset (Unix Domain Socket)
+								delete[] charData;
+								close(_pipeHandle);
+								_pipeHandle = INVALID_PIPE_HANDLE;
+								return;
+							}
+							delete[] charData;
+							return;
+						}
+						totalRead += bytesRead;
+					}
+
+					if (_stopRead) {
+						delete[] charData;
+						return;
+					}
+
+					charData[dataLength] = '\0';
+					msg = std::string(charData, dataLength);
+					delete[] charData;
+
+					if (msg.size() != dataLength)
+					{
+						app::RecordInfo("Err-recv msg size msg: %s", msg.c_str());
+						continue;
+					}
+				}
+			}
+#endif
 
 			if (!header.empty())
 			{
@@ -500,6 +676,7 @@ bool PipeClient::WriteToPiPe(const std::string head, const std::string& uuid, co
 	app::RecordInfo("Info-send begin %s", s_detaillog ? msg.c_str() : head.c_str());
 
 	bool bRet = true;
+#ifdef _WIN32
 	{
 		OVERLAPPED over = { 0 };
 		over.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -531,6 +708,35 @@ bool PipeClient::WriteToPiPe(const std::string head, const std::string& uuid, co
 			return bRet;
 		}
 	}
+#else
+	{
+		ssize_t bytesWritten = 0;
+		size_t totalWritten = 0;
+		const char* data = msg.c_str();
+		size_t dataSize = msg.size();
+
+		while (totalWritten < dataSize)
+		{
+			bytesWritten = write(_pipeHandle, data + totalWritten, dataSize - totalWritten);
+			if (bytesWritten < 0)
+			{
+				if (errno == EINTR) {
+					continue;
+				}
+				app::RecordInfo("Err-send write pipe errcode: %d", errno);
+				if (errno == EPIPE || errno == ECONNRESET)
+				{
+					// Broken pipe or connection reset (Unix Domain Socket)
+					close(_pipeHandle);
+					_pipeHandle = INVALID_PIPE_HANDLE;
+					return false;
+				}
+				return false;
+			}
+			totalWritten += bytesWritten;
+		}
+	}
+#endif
 
 	app::RecordInfo("Info-send succ uuid: %s", uuid.c_str());
 
@@ -904,7 +1110,12 @@ API_EXPORT RET_CALL Invoke(void* _in, void** _out, int* _out_size, int timeout)
 			{
 				int size = strRet.size() + 1;
 				char* cstr = new char[size];
+#ifdef _WIN32
 				strcpy_s(cstr, size, strRet.c_str());
+#else
+				strncpy(cstr, strRet.c_str(), size - 1);
+				cstr[size - 1] = '\0';
+#endif
 				*_out = cstr;
 				*_out_size = size;
 			}

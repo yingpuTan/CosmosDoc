@@ -101,34 +101,34 @@ namespace RpcWrapper
         private static CPPOnFreeVoidPtrDelegate cpp_OnFreeVoidPtr;
 
         // 导入 C++ 函数
-        [DllImport("PipeClient.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("PipeClient", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool InitClient(IntPtr pipename, int pipename_size, IntPtr logpath, int log_path_size, int protocolLevel, double del_log_cycle, bool bdetaillog);
 
-        [DllImport("PipeClient.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("PipeClient", CallingConvention = CallingConvention.Cdecl)]
         public static extern int Invoke(IntPtr _in, ref IntPtr _out, out int _outsize, int timeout = 30000);
 
-        [DllImport("PipeClient.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("PipeClient", CallingConvention = CallingConvention.Cdecl)]
         public static extern int Notify(IntPtr _in);
 
-        [DllImport("PipeClient.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("PipeClient", CallingConvention = CallingConvention.Cdecl)]
         public static extern int Subscribe(IntPtr _in);
 
-        [DllImport("PipeClient.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("PipeClient", CallingConvention = CallingConvention.Cdecl)]
         public static extern int Push(IntPtr _in);
 
-        [DllImport("PipeClient.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("PipeClient", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr CreateRpcRequest(string id, string method, IntPtr param);
 
-        [DllImport("PipeClient.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("PipeClient", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr CreateRpcPush(string topic, IntPtr param);
 
-        [DllImport("PipeClient.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("PipeClient", CallingConvention = CallingConvention.Cdecl)]
         public static extern void FreeRpcAllocMemory(IntPtr _in);
 
-        [DllImport("PipeClient.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("PipeClient", CallingConvention = CallingConvention.Cdecl)]
         public static extern void Register(CPPOnInvokeDelegate invoke, CPPOnNotifyDelegate notify, CPPOnSubscribeDelegate subscribe, CPPOnPushDelegate push, CPPOnFreeVoidPtrDelegate freevoidptr);
 
-        [DllImport("PipeClient.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("PipeClient", CallingConvention = CallingConvention.Cdecl)]
         public static extern void ExitApp();
 
         public CSharpRpcWrapper()
