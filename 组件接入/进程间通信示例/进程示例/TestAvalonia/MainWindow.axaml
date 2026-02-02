@@ -1,0 +1,108 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="TestAvalonia.MainWindow"
+        Title="Cosmos RPC 跨平台测试 Demo"
+        Width="900" Height="500"
+        Background="#FFA9CCC8">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        
+        <!-- 左侧面板：测试账户和 RPC 功能 -->
+        <Grid Grid.Column="0" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <TextBlock Grid.Row="0" Text="测试账户" FontSize="16" FontWeight="Bold" Margin="0,10,0,10"/>
+            
+            <Button Grid.Row="1" Name="notify" Content="第一步：通知对方来查询和订阅" 
+                    Height="43" Margin="0,5" Click="Button_Click"/>
+            
+            <Button Grid.Row="2" Name="push" Content="第二步：推送账户信息" 
+                    Height="44" Margin="0,5" Click="Button_Click"/>
+            
+            <TextBlock Grid.Row="3" Text="Invoke测试（对方默认5秒返回）" 
+                       Margin="0,20,0,10" FontSize="12"/>
+            
+            <Button Grid.Row="4" Name="invoke" Content="同步Invoke示例" 
+                    Height="44" Margin="0,5" Click="Button_Click"/>
+            
+            <Button Grid.Row="5" Name="invokeAsync" Content="异步Invoke示例" 
+                    Height="44" Margin="0,5" Click="Button_Click"/>
+        </Grid>
+        
+        <!-- 右侧面板：主题和组件通信测试 -->
+        <Grid Grid.Column="1" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <TextBlock Grid.Row="0" Text="测试统一UI" FontSize="16" FontWeight="Bold" Margin="0,10,0,10"/>
+            
+            <Button Grid.Row="1" Name="requestThemeRes" Content="第一步：获取皮肤资源" 
+                    Height="41" Margin="0,5" Click="Button_Click"/>
+            
+            <Button Grid.Row="2" Name="requestTheme" Content="第二步：获取当前皮肤主题" 
+                    Height="40" Margin="0,5" Click="Button_Click"/>
+            
+            <Button Grid.Row="3" Name="DemoButton" Content="效果展示按钮" 
+                    Height="30" Width="115" Margin="0,5" Click="Button_Click"/>
+            
+            <TextBlock Grid.Row="4" Text="组件通信透传测试" 
+                       FontSize="16" FontWeight="Bold" Margin="0,20,0,10"/>
+            
+            <Grid Grid.Row="5" Margin="0,5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="发送内容:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBox Grid.Column="1" Name="edit_content" Width="76" Margin="0,0,10,0"/>
+                
+                <TextBlock Grid.Column="2" Text="组名:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBox Grid.Column="3" Name="edit_group" Width="76" Margin="0,0,10,0"/>
+                
+                <ComboBox Grid.Column="4" Name="comType" Width="57" SelectedIndex="0" Margin="0,0,10,0">
+                    <ComboBoxItem Content="请求"/>
+                    <ComboBoxItem Content="推送"/>
+                </ComboBox>
+            </Grid>
+            
+            <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="0,10">
+                <Button Content="全局发送" Margin="0,0,10,0" Click="Button_Click_1"/>
+                <Button Content="组发送" Click="Button_Click_2"/>
+            </StackPanel>
+            
+            <!-- 状态显示区域 -->
+            <Border Grid.Row="7" BorderBrush="Gray" BorderThickness="1" 
+                    Background="White" Margin="0,10">
+                <ScrollViewer>
+                    <TextBlock Name="statusText" Text="状态信息将显示在这里..." 
+                               TextWrapping="Wrap" Margin="5"/>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
+
