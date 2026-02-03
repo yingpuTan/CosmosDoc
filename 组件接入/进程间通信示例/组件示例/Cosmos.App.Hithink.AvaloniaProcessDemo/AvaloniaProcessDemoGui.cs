@@ -64,10 +64,10 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
             // 获取 Avalonia 窗口句柄
             if (this.GetVisualRoot() is Window window)
             {
-                var platformHandle = window.PlatformImpl?.Handle;
-                if (platformHandle is IPlatformHandle handle)
+                var platformHandle = window.TryGetPlatformHandle();
+                if (platformHandle != null)
                 {
-                    return handle.Handle;
+                    return platformHandle.Handle;
                 }
             }
             return IntPtr.Zero;

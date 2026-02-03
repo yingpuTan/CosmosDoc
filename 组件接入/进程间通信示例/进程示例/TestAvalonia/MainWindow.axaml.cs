@@ -6,9 +6,16 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.Platform;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using Newtonsoft.Json.Linq;
 using RpcWrapper;
 using static RpcWrapper.CSharpRpcWrapper;
+
+#if WINDOWS
+using Avalonia.Win32;
+#endif
 
 namespace TestAvalonia
 {
@@ -17,6 +24,9 @@ namespace TestAvalonia
         public string? _wndInfo { get; set; }
         public string? _pipeName { get; set; }
         private bool _pipeSucc { get; set; }
+
+        private IntPtr curHwnd = IntPtr.Zero;
+        private ulong curX11Window = 0;  // Linux X11 窗口 ID
 
         private string? theme;
         private Dictionary<string, Dictionary<string, object>>? _themeResources;
@@ -34,6 +44,89 @@ namespace TestAvalonia
 
         private CSharpRpcWrapper wrapper = new CSharpRpcWrapper();
 
+#if WINDOWS
+        // Windows 平台 Win32 API
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool uFlags);
+
+        [DllImport("user32.dll")]
+        private static extern long GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll")]
+        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, long dwNewLong);
+
+        [DllImport("user32.dll")]
+        private static extern bool InvalidateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
+
+        [DllImport("user32.dll")]
+        private static extern bool UpdateWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetParent(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindow(IntPtr hWnd);
+
+        const uint SWP_NOZORDER = 0x0004;
+        const uint SWP_NOACTIVATE = 0x0010;
+        const uint SWP_SHOWWINDOW = 0x0040;
+        const int SW_HIDE = 0;
+        const int SW_SHOW = 5;
+
+        const long WS_CHILD = 0x40000000;
+        const long WS_BORDER = 0x00800000;
+        const long WS_POPUP = 0x80000000;
+        const long WS_THICKFRAME = 0x00040000;
+        const long WS_DLGFRAME = 0x00400000;
+        const long WS_EX_WINDOWEDGE = 0x00000100;
+        const long WS_EX_CLIENTEDGE = 0x00000200;
+#elif LINUX
+        // Linux 平台 X11 API
+        [DllImport("libX11.so.6")]
+        private static extern IntPtr XOpenDisplay(IntPtr display);
+
+        [DllImport("libX11.so.6")]
+        private static extern int XCloseDisplay(IntPtr display);
+
+        [DllImport("libX11.so.6")]
+        private static extern int XReparentWindow(IntPtr display, ulong w, ulong parent, int x, int y);
+
+        [DllImport("libX11.so.6")]
+        private static extern int XMoveResizeWindow(IntPtr display, ulong w, int x, int y, int width, int height);
+
+        [DllImport("libX11.so.6")]
+        private static extern int XMapRaised(IntPtr display, ulong w);
+
+        [DllImport("libX11.so.6")]
+        private static extern int XFlush(IntPtr display);
+
+        [DllImport("libX11.so.6")]
+        private static extern ulong XDefaultRootWindow(IntPtr display);
+
+        [DllImport("libX11.so.6")]
+        private static extern int XSetWindowBorderWidth(IntPtr display, ulong w, uint width);
+
+        [DllImport("libX11.so.6")]
+        private static extern int XUnmapWindow(IntPtr display, ulong w);
+
+        [DllImport("libX11.so.6")]
+        private static extern int XMapWindow(IntPtr display, ulong w);
+
+        private static IntPtr? x11Display = null;
+#endif
+
         public MainWindow()
         {
             InitializeComponent();
@@ -45,6 +138,7 @@ namespace TestAvalonia
             };
             g_mapActInfo["123456"] = info;
 
+            // 使用 Opened 事件处理连接
             this.Opened += MainWindow_Opened;
 
             wrapper.OnInvoke += On_Invoke;
@@ -68,7 +162,451 @@ namespace TestAvalonia
                 // 显示连接对话框
                 ShowConnectDialog();
             }
+
+            // 延迟处理窗口嵌入，确保窗口句柄已创建
+            if (!string.IsNullOrEmpty(_wndInfo))
+            {
+                // 使用多个时机尝试设置父窗口，确保窗口句柄已创建
+                SetupParentWindowWithRetry();
+            }
         }
+
+        private void SetupParentWindow()
+        {
+            if (string.IsNullOrEmpty(_wndInfo))
+            {
+                return;
+            }
+
+            string[] parts = _wndInfo.Split('|');
+            if (parts.Length < 3)
+            {
+                return;
+            }
+
+            // 解析窗口信息：parentHandle|width|height
+            string msg = parts[0];
+            string strwidth = parts[1];
+            string strheight = parts[2];
+
+            int parHandle = 0;
+            int.TryParse(msg, out parHandle);
+
+            if (parHandle == 0)
+            {
+                return;
+            }
+
+#if WINDOWS
+            // Windows 平台：使用 Win32 API 设置父窗口
+            TrySetupParentWindow();
+#elif LINUX
+            // Linux 平台：使用 X11 API 设置父窗口
+            SetupParentWindowLinux(parHandle, strwidth, strheight);
+#else
+            // macOS 平台：暂不支持
+            AddStatusMessage("macOS 平台的窗口嵌入功能需要额外实现");
+#endif
+        }
+
+#if WINDOWS
+        private void SetupParentWindowWithRetry(int retryCount = 0)
+        {
+            const int maxRetries = 10;
+            const int retryDelay = 50; // 毫秒
+
+            if (retryCount >= maxRetries)
+            {
+                AddStatusMessage("设置父窗口失败：超过最大重试次数");
+                return;
+            }
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                // 尝试获取窗口句柄
+                curHwnd = GetWindowHandle();
+                if (curHwnd == IntPtr.Zero)
+                {
+                    // 如果获取失败，延迟重试
+                    Task.Delay(retryDelay).ContinueWith(_ =>
+                    {
+                        SetupParentWindowWithRetry(retryCount + 1);
+                    });
+                    return;
+                }
+
+                // 窗口句柄已获取，尝试设置父窗口
+                TrySetupParentWindow();
+            }, DispatcherPriority.Loaded);
+        }
+#endif
+
+#if WINDOWS
+        private void TrySetupParentWindow()
+        {
+            if (string.IsNullOrEmpty(_wndInfo))
+            {
+                return;
+            }
+
+            string[] parts = _wndInfo.Split('|');
+            if (parts.Length < 3)
+            {
+                return;
+            }
+
+            string msg = parts[0];
+            string strwidth = parts[1];
+            string strheight = parts[2];
+
+            int parHandle = 0;
+            int.TryParse(msg, out parHandle);
+
+            if (parHandle == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                // 尝试获取当前窗口句柄（可能需要多次尝试）
+                curHwnd = GetWindowHandle();
+                if (curHwnd == IntPtr.Zero)
+                {
+                    // 如果获取失败，延迟重试
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        Task.Delay(50).ContinueWith(_ =>
+                        {
+                            Dispatcher.UIThread.Post(() => TrySetupParentWindow(), DispatcherPriority.Loaded);
+                        });
+                    }, DispatcherPriority.Loaded);
+                    return;
+                }
+
+                // 验证父窗口句柄是否有效
+                IntPtr parentHwnd = new IntPtr(parHandle);
+                if (parentHwnd == IntPtr.Zero)
+                {
+                    AddStatusMessage("父窗口句柄无效");
+                    return;
+                }
+
+                // 解析窗口大小
+                double width = 0;
+                double.TryParse(strwidth, out width);
+                double height = 0;
+                double.TryParse(strheight, out height);
+
+                // 验证父窗口句柄是否有效（检查窗口是否存在）
+                if (!IsWindow(parentHwnd))
+                {
+                    AddStatusMessage($"父窗口句柄无效或窗口不存在: {parentHwnd.ToInt64()}");
+                    return;
+                }
+
+                // 先隐藏窗口（如果可见）- 这很重要，可以避免窗口状态冲突
+                ShowWindow(curHwnd, SW_HIDE);
+
+                // 设置窗口样式（必须在 SetParent 之前）
+                long lPreStyle = GetWindowLong(curHwnd, -16);  // GWL_STYLE
+                long lPreExStyle = GetWindowLong(curHwnd, -20); // GWL_EXSTYLE
+
+                // 保存原始样式（用于调试）
+                long originalStyle = lPreStyle;
+                long originalExStyle = lPreExStyle;
+
+                lPreStyle &= ~WS_POPUP;
+                lPreStyle |= WS_CHILD;
+                lPreStyle &= ~(WS_BORDER | WS_THICKFRAME | WS_DLGFRAME);
+                lPreExStyle &= ~(WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE);
+
+                SetWindowLong(curHwnd, -16, lPreStyle);
+                SetWindowLong(curHwnd, -20, lPreExStyle);
+
+                // 设置窗口样式属性（在 SetParent 之前设置，避免窗口管理器干扰）
+                this.WindowState = WindowState.Normal;
+                this.CanResize = false;
+                this.ShowInTaskbar = false;
+
+                // 设置父窗口（关键步骤）
+                // 注意：SetParent 的参数类型，TestWpf 中使用的是 int，这里使用 IntPtr
+                IntPtr oldParent = SetParent(curHwnd, parentHwnd);
+                
+                // 清除错误状态
+                Marshal.GetLastWin32Error();
+                
+                // 立即验证父窗口是否设置成功
+                IntPtr verifyParent = GetParent(curHwnd);
+                if (verifyParent != parentHwnd)
+                {
+                    AddStatusMessage($"第一次 SetParent 后验证失败。当前父窗口: {verifyParent.ToInt64()}, 期望: {parentHwnd.ToInt64()}");
+                    
+                    // 再次设置窗口样式，确保样式正确
+                    SetWindowLong(curHwnd, -16, lPreStyle);
+                    SetWindowLong(curHwnd, -20, lPreExStyle);
+                    
+                    // 尝试再次设置父窗口
+                    IntPtr retryParent = SetParent(curHwnd, parentHwnd);
+                    Marshal.GetLastWin32Error(); // 清除错误状态
+                    
+                    // 再次验证
+                    verifyParent = GetParent(curHwnd);
+                    if (verifyParent != parentHwnd)
+                    {
+                        AddStatusMessage($"重试 SetParent 后仍然失败。当前父窗口: {verifyParent.ToInt64()}, 期望: {parentHwnd.ToInt64()}");
+                        AddStatusMessage($"原始样式: {originalStyle}, 新样式: {lPreStyle}");
+                        ShowWindow(curHwnd, SW_SHOW); // 恢复显示
+                        return;
+                    }
+                    else
+                    {
+                        AddStatusMessage("重试 SetParent 成功");
+                    }
+                }
+
+                // 设置窗口样式属性
+                this.WindowState = WindowState.Normal;
+                this.CanResize = false;
+                this.ShowInTaskbar = false;
+
+                // 设置窗口大小和位置
+                if (width > 0 && height > 0)
+                {
+                    this.Width = width;
+                    this.Height = height;
+                    
+                    // 使用 SetWindowPos 强制更新窗口位置和大小
+                    SetWindowPos(curHwnd, IntPtr.Zero, 0, 0, (int)width, (int)height, 
+                        SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                    
+                    // 也调用 MoveWindow 确保位置正确
+                    MoveWindow(curHwnd, 0, 0, (int)width, (int)height, false);
+                    
+                    // 强制刷新窗口
+                    InvalidateRect(curHwnd, IntPtr.Zero, true);
+                    UpdateWindow(curHwnd);
+                }
+                else
+                {
+                    // 即使没有指定大小，也要显示窗口
+                    ShowWindow(curHwnd, SW_SHOW);
+                }
+
+                // 强制刷新窗口消息队列（使用 Win32 API）
+                // 发送 WM_NULL 消息来刷新消息队列
+                PostMessage(curHwnd, 0x0000, IntPtr.Zero, IntPtr.Zero);
+
+                // 延迟验证父窗口设置（给系统时间处理窗口消息）
+                Task.Delay(100).ContinueWith(_ =>
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        IntPtr currentParent = GetParent(curHwnd);
+                        if (currentParent == parentHwnd)
+                        {
+                            AddStatusMessage($"窗口已成功嵌入父窗口，句柄: {parHandle}, 大小: {width}x{height}");
+                        }
+                        else
+                        {
+                            AddStatusMessage($"警告：父窗口设置可能未生效。当前父窗口: {currentParent.ToInt64()}, 期望: {parentHwnd.ToInt64()}");
+                            // 尝试再次设置
+                            IntPtr retryParent = SetParent(curHwnd, parentHwnd);
+                            if (retryParent != IntPtr.Zero)
+                            {
+                                SetWindowPos(curHwnd, IntPtr.Zero, 0, 0, (int)width, (int)height, 
+                                    SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                                AddStatusMessage("已重试设置父窗口");
+                            }
+                        }
+                    });
+                });
+            }
+            catch (Exception ex)
+            {
+                AddStatusMessage($"设置父窗口失败: {ex.Message}");
+            }
+        }
+#endif
+
+#if LINUX
+        private void SetupParentWindowLinux(int parHandle, string strwidth, string strheight)
+        {
+            // Linux 平台：使用 X11 API 设置父窗口
+            Dispatcher.UIThread.Post(() =>
+            {
+                try
+                {
+                    // 获取当前窗口的 X11 窗口 ID
+                    curX11Window = GetX11WindowHandle();
+                    if (curX11Window == 0)
+                    {
+                        AddStatusMessage("无法获取 X11 窗口 ID");
+                        return;
+                    }
+
+                    // 打开 X11 显示连接
+                    if (x11Display == null)
+                    {
+                        x11Display = XOpenDisplay(IntPtr.Zero);
+                        if (x11Display == IntPtr.Zero)
+                        {
+                            AddStatusMessage("无法打开 X11 显示连接");
+                            return;
+                        }
+                    }
+
+                    // 解析窗口大小
+                    double width = 0;
+                    double.TryParse(strwidth, out width);
+                    double height = 0;
+                    double.TryParse(strheight, out height);
+
+                    // 将父窗口句柄转换为 ulong（X11 窗口 ID）
+                    ulong parentWindowId = (ulong)parHandle;
+
+                    // 设置窗口无边框
+                    XSetWindowBorderWidth(x11Display.Value, curX11Window, 0);
+
+                    // 重新设置父窗口
+                    int result = XReparentWindow(x11Display.Value, curX11Window, parentWindowId, 0, 0);
+                    if (result == 0)
+                    {
+                        // 设置窗口大小和位置
+                        if (width > 0 && height > 0)
+                        {
+                            XMoveResizeWindow(x11Display.Value, curX11Window, 0, 0, (int)width, (int)height);
+                            this.Width = width;
+                            this.Height = height;
+                        }
+
+                        // 显示窗口
+                        XMapRaised(x11Display.Value, curX11Window);
+                        XFlush(x11Display.Value);
+
+                        // 设置窗口样式属性
+                        this.WindowState = WindowState.Normal;
+                        this.CanResize = false;
+                        this.ShowInTaskbar = false;
+
+                        AddStatusMessage($"窗口已嵌入父窗口 (X11 ID: {parentWindowId}), 大小: {width}x{height}");
+                    }
+                    else
+                    {
+                        AddStatusMessage($"XReparentWindow 失败，返回码: {result}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AddStatusMessage($"设置父窗口失败: {ex.Message}");
+                }
+            }, DispatcherPriority.Loaded);
+        }
+#endif
+
+        private IntPtr GetWindowHandle()
+        {
+#if WINDOWS
+            // 获取 Avalonia 窗口句柄（Windows 平台）
+            try
+            {
+                // 方法1: 使用 TryGetPlatformHandle 扩展方法（推荐方式）
+                var platformHandle = this.TryGetPlatformHandle();
+                if (platformHandle != null)
+                {
+                    return platformHandle.Handle;
+                }
+
+                // 方法2: 尝试通过 PlatformImpl 获取
+                if (this.PlatformImpl != null)
+                {
+                    // 使用反射获取 Handle 属性
+                    var handleProperty = this.PlatformImpl.GetType().GetProperty("Handle",
+                        BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+                    if (handleProperty != null)
+                    {
+                        var handle = handleProperty.GetValue(this.PlatformImpl);
+                        if (handle is IPlatformHandle platformHandle2)
+                        {
+                            return platformHandle2.Handle;
+                        }
+                        else if (handle is IntPtr ptr && ptr != IntPtr.Zero)
+                        {
+                            return ptr;
+                        }
+                    }
+                }
+
+                // 方法3: 尝试通过反射获取 WindowImpl 的 Handle
+                if (this.PlatformImpl != null)
+                {
+                    var platformImplType = this.PlatformImpl.GetType();
+                    // 检查是否是 Windows 平台的实现
+                    if (platformImplType.FullName?.Contains("Win32") == true || 
+                        platformImplType.FullName?.Contains("Windows") == true)
+                    {
+                        var handleProperty = platformImplType.GetProperty("Handle",
+                            BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+                        if (handleProperty != null)
+                        {
+                            var handle = handleProperty.GetValue(this.PlatformImpl);
+                            if (handle is IPlatformHandle platformHandle3)
+                            {
+                                return platformHandle3.Handle;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AddStatusMessage($"获取窗口句柄时出错: {ex.Message}");
+            }
+#endif
+            return IntPtr.Zero;
+        }
+
+#if LINUX
+        private ulong GetX11WindowHandle()
+        {
+            // 获取 Avalonia 窗口的 X11 窗口 ID
+            try
+            {
+                // 方法1: 尝试通过 PlatformImpl 获取
+                if (this.PlatformImpl != null)
+                {
+                    // 使用反射获取窗口句柄
+                    var handleProperty = this.PlatformImpl.GetType().GetProperty("Handle",
+                        BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+                    if (handleProperty != null)
+                    {
+                        var handle = handleProperty.GetValue(this.PlatformImpl);
+                        if (handle is IPlatformHandle platformHandle)
+                        {
+                            // X11 窗口 ID 是 Handle 的值（ulong）
+                            return (ulong)platformHandle.Handle.ToInt64();
+                        }
+                        else if (handle is IntPtr ptr && ptr != IntPtr.Zero)
+                        {
+                            return (ulong)ptr.ToInt64();
+                        }
+                    }
+                }
+
+                // 方法2: 尝试通过扩展方法获取
+                var platformHandle2 = this.TryGetPlatformHandle();
+                if (platformHandle2 != null)
+                {
+                    return (ulong)platformHandle2.Handle.ToInt64();
+                }
+            }
+            catch (Exception ex)
+            {
+                AddStatusMessage($"获取 X11 窗口 ID 失败: {ex.Message}");
+            }
+            return 0;
+        }
+#endif
 
         private async void ShowConnectDialog()
         {
@@ -188,19 +726,43 @@ namespace TestAvalonia
 
             if (method == "setsize")
             {
-                // 调整尺寸位置（Avalonia 中不需要 Win32 API）
+                // 调整尺寸位置
                 double scaling = request.param?["curscaling"]?.ToObject<double>() ?? 1.0;
                 double dpiratio = request.param?["dpiRatio"]?.ToObject<double>() ?? 1.0;
+                double prescaling = request.param?["prescaling"]?.ToObject<double>() ?? 1.0;
                 double width = request.param?["width"]?.ToObject<double>() ?? 0;
                 double height = request.param?["height"]?.ToObject<double>() ?? 0;
 
+                double actwidth = width * dpiratio / scaling;
+                double actheight = height * dpiratio / scaling;
+
                 Dispatcher.UIThread.Post(() =>
                 {
-                    this.Width = width;
-                    this.Height = height;
+                    if (width > 0 && height > 0)
+                    {
+                        this.Width = actwidth;
+                        this.Height = actheight;
+
+#if WINDOWS
+                        // 如果窗口已嵌入父窗口，使用 Win32 API 更新位置和大小
+                        if (curHwnd != IntPtr.Zero)
+                        {
+                            MoveWindow(curHwnd, 0, 0, (int)actwidth, (int)actheight, false);
+                            InvalidateRect(curHwnd, IntPtr.Zero, true);
+                            UpdateWindow(curHwnd);
+                        }
+#elif LINUX
+                        // 如果窗口已嵌入父窗口，使用 X11 API 更新位置和大小
+                        if (curX11Window != 0 && x11Display != null && x11Display != IntPtr.Zero)
+                        {
+                            XMoveResizeWindow(x11Display.Value, curX11Window, 0, 0, (int)actwidth, (int)actheight);
+                            XFlush(x11Display.Value);
+                        }
+#endif
+                    }
                 });
 
-                AddStatusMessage($"  → 收到窗口尺寸调整通知: {width}x{height}");
+                AddStatusMessage($"  → 收到窗口尺寸调整通知: {actwidth}x{actheight} (原始: {width}x{height})");
             }
             else if (method == "close")
             {
@@ -600,6 +1162,14 @@ namespace TestAvalonia
 
         protected override void OnClosed(EventArgs e)
         {
+#if LINUX
+            // 关闭 X11 显示连接
+            if (x11Display != null && x11Display != IntPtr.Zero)
+            {
+                XCloseDisplay(x11Display.Value);
+                x11Display = null;
+            }
+#endif
             wrapper?.Exit();
             base.OnClosed(e);
         }
