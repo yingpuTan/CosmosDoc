@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Cosmos>
+  <!-- app元数据 -->
+  <App>
+    <Version>1.0.0.0</Version>
+    <Base>
+	  <!-- 包id，填入在管理端申请应用是返回的Appid -->
+      <Guid>qt-process-demo-guid</Guid>
+      <Name>
+        <zh-CN>Qt进程demo</zh-CN>
+        <en-US>Qt进程demo</en-US>
+      </Name>
+      <Description>
+        <zh-CN>Qt进程demo</zh-CN>
+        <en-US>Qt进程demo</en-US>
+      </Description>
+    </Base>
+    <!-- widget元数据集 -->
+    <Widgets>
+      <Widget>
+        <Base>
+		  <!-- 组件id，填入在管理端申请应用是添加组件返回的Widgetid -->
+          <Guid>qt-process-demo-widget-guid</Guid>  
+          <Name>
+            <zh-CN>Qt进程demo</zh-CN>
+            <en-US>Qt进程demo</en-US>
+          </Name>
+          <Description>
+            <zh-CN>Qt进程demo</zh-CN>
+            <en-US>Qt进程demo</en-US>
+          </Description>
+        </Base>
+		<Group>hq</Group>
+		<!-- 组件库路径 -->
+        <LibraryFile>Cosmos.App.Hithink.QtProcessDemo.dll</LibraryFile>
+		<!-- 组件库入口类 -->
+		<RuntimeType>Cosmos.App.Hithink.QtProcessDemo.QtProcessDemoGui</RuntimeType>
+        <GuiFrameworks>wpf</GuiFrameworks>
+      </Widget>
+    </Widgets>
+  </App>
+</Cosmos>
+

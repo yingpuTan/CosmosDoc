@@ -1,5 +1,6 @@
 using System;
-using System.Runtime.InteropServices;
+using System.IO;
+using System.Reflection;
 using Cosmos.App.Sdk.v1;
 using Cosmos.App.Sdk.Windows;
 using Newtonsoft.Json.Linq;
@@ -9,28 +10,24 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform;
+using Path = System.IO.Path;
 
-namespace Cosmos.App.Hithink.AvaloniaProcessDemo
+namespace Cosmos.App.Hithink.QtProcessDemo
 {
-    public class AvaloniaProcessDemoGui :
-        WpfCosmosAppProcessWidget //进程间通讯基类，假设Avalonia也使用相同的基类或需要适配
+    public class QtProcessDemoGui :
+        WpfCosmosAppProcessWidget //进程间通讯基类，支持跨平台
     {
         private ProcessDemoGuiBase _baseImpl;
         private NativeControlHost _nativeHost;
         private double _dpiRatioFirst = 1;
         private double _previousDpiScale = 1.0;
 
-        public AvaloniaProcessDemoGui()
+        public QtProcessDemoGui()
         {
             _nativeHost = new NativeControlHost();
             _nativeHost.Margin = new Thickness(0);
-            
-            // 设置大小改变事件
             _nativeHost.SizeChanged += NativeHost_SizeChanged;
-            
-            // 设置窗口加载成功事件
             _nativeHost.AttachedToVisualTree += NativeHost_AttachedToVisualTree;
-            
             Content = _nativeHost;
 
             _baseImpl = new ProcessDemoGuiBase();
@@ -60,7 +57,6 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
 
         private IntPtr GetWindowHandle()
         {
-            // 获取 Avalonia 窗口句柄
             if (this.GetVisualRoot() is Window window)
             {
                 var platformHandle = window.TryGetPlatformHandle();
@@ -74,7 +70,6 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
 
         private double GetCurrentDpiScale()
         {
-            // 获取 Avalonia DPI 缩放比例
             if (this.GetVisualRoot() is Window window)
             {
                 return window.RenderScaling;
@@ -84,10 +79,11 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
 
         private void NativeHost_AttachedToVisualTree(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
         {
-            _logger?.Log(CosmosLogLevel.Information, "NativeHost_AttachedToVisualTree");
+            _logger?.Log(CosmosLogLevel.Information, "QtProcessDemoGui NativeHost_AttachedToVisualTree");
 
+            var clientDir = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location))), @"content/dependents/TestQt");
             //窗口创建成功、可以启动进程通信服务
-            _baseImpl.StartRpcServer();
+            _baseImpl.StartRpcServer(clientDir);
         }
 
         private void NativeHost_SizeChanged(object? sender, SizeChangedEventArgs e)
@@ -99,11 +95,8 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
         {
             try
             {
-                //切换到主线程获取窗口大小
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    //窗口发生变化、通知进程需要调整窗口大小
-                    //组装调整大小命令、进程按照该组装方式进行解析
                     var currentDpi = GetCurrentDpiScale();
                     ICosmosRpcRequest request = CreateRpcRequest();
                     request.id = Guid.NewGuid().ToString();
@@ -131,8 +124,6 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
         /// <summary>
         /// 组件第一次启动时会调用到该方法。可以在这个函数中做初始化操作。
         /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
             await _baseImpl.StartAsync(cancellationToken);
@@ -141,8 +132,6 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
         /// <summary>
         /// 组件彻底关闭时会调用到该方法。可以在这个函数中做一些析构的操作。
         /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
             await _baseImpl.StopAsync(cancellationToken);
@@ -150,20 +139,15 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
 
         /// <summary>
         /// 该接口设计初衷是在组件最小化或者隐藏时调用，用于节省流量和cpu消耗，目前暂未实现
-        /// 举例，行情买卖五档可在此函数中暂停订阅成交数据、停止发送UI交互事件
         /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
         public override Task PauseAsync(CancellationToken cancellationToken)
         {
             return _baseImpl.PauseAsync(cancellationToken);
         }
+
         /// <summary>
         /// 该接口设计初衷是在组件重新显示时调用，目前暂未实现
-        /// 举例，行情买卖五档可在此函数中重新订阅成交数据
         /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
         public override Task ContinueAsync(CancellationToken cancellationToken)
         {
             return _baseImpl.ContinueAsync(cancellationToken);
@@ -171,18 +155,11 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
 
         /// <summary>
         /// 该接口定义了当前组件和实例上下文的注入点，这些上下文在构造后由Cosmos引擎自动注入
-        /// 可在该成员中实现对上下文的初始化和修改
         /// </summary>
         public override ICosmosAppContextInjection ContextInjection
         {
-            get
-            {
-                return _baseImpl.ContextInjection;
-            }
-            set
-            {
-                _baseImpl.ContextInjection = value;
-            }
+            get => _baseImpl.ContextInjection;
+            set => _baseImpl.ContextInjection = value;
         }
 
         public override ICosmosAppAccessProvider AccessProvider 
@@ -243,4 +220,3 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
         #endregion
     }
 }
-

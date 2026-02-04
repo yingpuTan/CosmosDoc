@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	<Version>0.0.62</Version>
+	<Description>Qt进程demo</Description>
+	<Title>Qt进程demo</Title>
+	<PackageIcon>PackageIcon.png</PackageIcon>
+	<PackageTags>qt-process-demo-guid</PackageTags>
+	<PackageId>qt-process-demo-guid</PackageId>
+	<Configurations>Debug;Release;Publish</Configurations>
+	<DefineConstants>AVALONIA</DefineConstants>
+  </PropertyGroup>
+	<!--添加元数据文件到nupkg，组件运行时需要从该文件读取信息-->
+	<ItemGroup>
+		<Content Include="CosmosAppMetadata.xml" />
+	</ItemGroup>
+	<!--添加组件图标，打包nupkg需要-->
+	<ItemGroup>
+		<None Update="PackageIcon.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+	  <PackageReference Include="Cosmos.OsslSignCode.Native" Version="0.0.5" />
+	  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+	  <PackageReference Include="System.Drawing.Common" Version="5.0.0" />
+	  <PackageReference Include="Avalonia" Version="11.0.0" />
+	</ItemGroup>
+	<ItemGroup>
+		<Content Include="dependents\*.*">
+			<Pack>true</Pack>
+			<PackagePath>content\dependents\%(FileName)%(Extension)</PackagePath>
+		</Content>
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\Cosmos.App.Sdk.Windows\Cosmos.App.Sdk.Windows.csproj" />
+	  <ProjectReference Include="..\Cosmos.App.Sdk\Cosmos.App.Sdk.csproj" />
+	  <ProjectReference Include="..\Cosmos.App.Hithink.ProcessDemo.Shared\Cosmos.App.Hithink.ProcessDemo.Shared.csproj" />
+	</ItemGroup>
+</Project>
