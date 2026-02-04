@@ -1,4 +1,4 @@
-# 定义可用的平台选项
+﻿# 定义可用的平台选项
 $platforms = @(
     @{Name = "Windows x64"; Value = "win-x64"},
     @{Name = "Windows x86"; Value = "win-x86"},

@@ -1,18 +1,37 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
     <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
-    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+  <!-- Windows 平台特定配置 -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' or '$(RuntimeIdentifier)' == 'win-x86' or '$(RuntimeIdentifier)' == 'win-arm64' or '$(RuntimeIdentifier)' == ''">
+    <OutputType>WinExe</OutputType>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <!-- Linux/macOS 平台配置 -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64' or '$(RuntimeIdentifier)' == 'linux-arm64' or '$(RuntimeIdentifier)' == 'osx-x64' or '$(RuntimeIdentifier)' == 'osx-arm64'">
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <!-- 根据 RuntimeIdentifier 设置编译常量（支持跨平台编译） -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' or '$(RuntimeIdentifier)' == 'win-x86' or '$(RuntimeIdentifier)' == 'win-arm64'">
     <DefineConstants>WINDOWS</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))">
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64' or '$(RuntimeIdentifier)' == 'linux-arm64'">
+    <DefineConstants>LINUX</DefineConstants>
+  </PropertyGroup>
+
+  <!-- 如果没有指定 RuntimeIdentifier，根据当前操作系统设置（用于本地开发） -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == '' and '$(OS)' == 'Windows_NT'">
+    <DefineConstants>WINDOWS</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == '' and $([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))">
     <DefineConstants>LINUX</DefineConstants>
   </PropertyGroup>
 
@@ -21,13 +40,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.0.0" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.0.0" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.0.0" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.0.0" />
+    <PackageReference Include="Avalonia" Version="11.0.10" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.0.10" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.0.10" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.0.10" />
     <!-- Conditionally enable platform-specific code -->
-    <PackageReference Include="Avalonia.Native" Version="11.0.0" Condition="'$(RuntimeIdentifier)' == 'osx-x64' or '$(RuntimeIdentifier)' == 'osx-arm64'" />
-    <PackageReference Include="Avalonia.Browser" Version="11.0.0" Condition="'$(RuntimeIdentifier)' == 'browser-wasm'" />
+    <PackageReference Include="Avalonia.Native" Version="11.0.10" Condition="'$(RuntimeIdentifier)' == 'osx-x64' or '$(RuntimeIdentifier)' == 'osx-arm64'" />
+    <PackageReference Include="Avalonia.Browser" Version="11.0.10" Condition="'$(RuntimeIdentifier)' == 'browser-wasm'" />
   </ItemGroup>
 
   <ItemGroup>

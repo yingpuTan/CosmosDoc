@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -27,6 +30,10 @@ namespace TestAvalonia
 
         private IntPtr curHwnd = IntPtr.Zero;
         private ulong curX11Window = 0;  // Linux X11 窗口 ID
+#if LINUX
+        // 标记是否已经成功完成一次 X11 嵌入，避免重复 Reparent/闪烁
+        private bool _x11Embedded = false;
+#endif
 
         private string? theme;
         private Dictionary<string, Dictionary<string, object>>? _themeResources;
@@ -43,6 +50,11 @@ namespace TestAvalonia
         static Dictionary<string, AccountInfo> g_mapActInfo = new Dictionary<string, AccountInfo>();
 
         private CSharpRpcWrapper wrapper = new CSharpRpcWrapper();
+
+        // 日志文件相关
+        private static readonly object _logFileLock = new object();
+        private static StreamWriter? _logFileWriter = null;
+        private static string _logFilePath = "test_avalonia_status.log";
 
 #if WINDOWS
         // Windows 平台 Win32 API
@@ -124,75 +136,186 @@ namespace TestAvalonia
         [DllImport("libX11.so.6")]
         private static extern int XMapWindow(IntPtr display, ulong w);
 
+        // 获取窗口几何信息（用于获取父窗口实际大小，避免仅依赖命令行宽高）
+        [DllImport("libX11.so.6")]
+        private static extern int XGetGeometry(
+            IntPtr display,
+            ulong drawable,
+            out ulong root_return,
+            out int x_return,
+            out int y_return,
+            out uint width_return,
+            out uint height_return,
+            out uint border_width_return,
+            out uint depth_return);
+
         private static IntPtr? x11Display = null;
 #endif
 
         public MainWindow()
         {
-            InitializeComponent();
-            
-            // 初始化全局变量
-            AccountInfo info = new AccountInfo
+            try
             {
-                ID = "123456"
-            };
-            g_mapActInfo["123456"] = info;
+                // 初始化日志文件（最早执行，确保后续日志能记录）
+                InitializeLogFile();
+                WriteToLogFile("MainWindow 构造函数开始");
 
-            // 使用 Opened 事件处理连接
-            this.Opened += MainWindow_Opened;
+                InitializeComponent();
+                WriteToLogFile("InitializeComponent 完成");
 
-            wrapper.OnInvoke += On_Invoke;
-            wrapper.OnPush += On_Push;
-            wrapper.OnNotify += On_Notify;
-            wrapper.OnSubscribe += On_Subscribe;
+#if LINUX
+                // Linux 下默认先隐藏窗口（通过透明度），嵌入成功后再显示，减少初次黑框闪烁
+                try
+                {
+                    this.Opacity = 0;
+                    WriteToLogFile("Linux 平台初始设置 Opacity=0，等待嵌入完成后再显示");
+                }
+                catch (Exception ex)
+                {
+                    WriteToLogFile($"设置初始 Opacity=0 失败: {ex.GetType().Name} - {ex.Message}");
+                }
+#endif
+                
+                // 初始化全局变量
+                AccountInfo info = new AccountInfo
+                {
+                    ID = "123456"
+                };
+                g_mapActInfo["123456"] = info;
+                WriteToLogFile("全局变量初始化完成");
+
+                // 使用 Opened 事件处理连接
+                this.Opened += MainWindow_Opened;
+                WriteToLogFile("Opened 事件已注册");
+
+                wrapper.OnInvoke += On_Invoke;
+                wrapper.OnPush += On_Push;
+                wrapper.OnNotify += On_Notify;
+                wrapper.OnSubscribe += On_Subscribe;
+                WriteToLogFile("RPC 回调事件已注册");
+                WriteToLogFile("MainWindow 构造函数完成");
+            }
+            catch (Exception ex)
+            {
+                WriteToLogFile($"MainWindow 构造函数异常: {ex.GetType().Name} - {ex.Message}");
+                WriteToLogFile($"堆栈跟踪: {ex.StackTrace}");
+                throw;
+            }
+        }
+
+        private void InitializeLogFile()
+        {
+            try
+            {
+                lock (_logFileLock)
+                {
+                    if (_logFileWriter == null)
+                    {
+                        // 确保日志目录存在
+                        string? directory = Path.GetDirectoryName(_logFilePath);
+                        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                        {
+                            Directory.CreateDirectory(directory);
+                        }
+
+                        // 创建日志文件，使用追加模式
+                        _logFileWriter = new StreamWriter(_logFilePath, true, Encoding.UTF8)
+                        {
+                            AutoFlush = true
+                        };
+                        _logFileWriter.WriteLine($"========== 日志开始 {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==========");
+                        _logFileWriter.WriteLine($"进程ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
+                        _logFileWriter.WriteLine($"操作系统: {System.Runtime.InteropServices.RuntimeInformation.OSDescription}");
+                        _logFileWriter.WriteLine($"运行时: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
+                        _logFileWriter.Flush(); // 强制刷新，确保立即写入磁盘
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // 如果无法创建日志文件，尝试写入备用日志文件
+                try
+                {
+                    string backupLogPath = "test_avalonia_status_backup.log";
+                    File.AppendAllText(backupLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] 无法初始化主日志文件: {ex.Message}\n");
+                    File.AppendAllText(backupLogPath, $"异常详情: {ex}\n");
+                }
+                catch { }
+                System.Diagnostics.Debug.WriteLine($"无法初始化日志文件: {ex.Message}");
+            }
         }
 
         private void MainWindow_Opened(object? sender, EventArgs e)
         {
-            // 注册回调函数
-            RegisterCallBack();
+            try
+            {
+                WriteToLogFile("MainWindow_Opened 事件触发");
+                
+                // 注册回调函数
+                RegisterCallBack();
+                WriteToLogFile("回调函数注册完成");
 
-            // 连接管道（如果提供了管道名称）
-            if (!string.IsNullOrEmpty(_pipeName))
-            {
-                Connect();
-            }
-            else
-            {
-                // 显示连接对话框
-                ShowConnectDialog();
-            }
+                // 连接管道（如果提供了管道名称）
+                if (!string.IsNullOrEmpty(_pipeName))
+                {
+                    WriteToLogFile($"准备连接管道: {_pipeName}");
+                    Connect();
+                }
+                else
+                {
+                    WriteToLogFile("未提供管道名称，显示连接对话框");
+                    // 显示连接对话框
+                    ShowConnectDialog();
+                }
 
-            // 延迟处理窗口嵌入，确保窗口句柄已创建
-            if (!string.IsNullOrEmpty(_wndInfo))
+                // 延迟处理窗口嵌入，确保窗口句柄已创建
+                if (!string.IsNullOrEmpty(_wndInfo))
+                {
+                    WriteToLogFile($"准备设置父窗口: {_wndInfo}");
+                    // 使用多个时机尝试设置父窗口，确保窗口句柄已创建
+                    SetupParentWindowWithRetry();
+                }
+                else
+                {
+                    WriteToLogFile("未提供窗口信息，跳过窗口嵌入");
+                }
+                
+                WriteToLogFile("MainWindow_Opened 事件处理完成");
+            }
+            catch (Exception ex)
             {
-                // 使用多个时机尝试设置父窗口，确保窗口句柄已创建
-                SetupParentWindowWithRetry();
+                WriteToLogFile($"MainWindow_Opened 异常: {ex.GetType().Name} - {ex.Message}");
+                WriteToLogFile($"堆栈跟踪: {ex.StackTrace}");
+                throw;
             }
         }
 
-        private void SetupParentWindow()
+        // 解析窗口信息：parentHandle|width|height
+        private bool ParseWindowInfo(out int parHandle, out string strwidth, out string strheight)
         {
+            parHandle = 0;
+            strwidth = "";
+            strheight = "";
+
             if (string.IsNullOrEmpty(_wndInfo))
             {
-                return;
+                return false;
             }
 
             string[] parts = _wndInfo.Split('|');
             if (parts.Length < 3)
             {
-                return;
+                return false;
             }
 
-            // 解析窗口信息：parentHandle|width|height
-            string msg = parts[0];
-            string strwidth = parts[1];
-            string strheight = parts[2];
+            strwidth = parts[1];
+            strheight = parts[2];
+            return int.TryParse(parts[0], out parHandle) && parHandle != 0;
+        }
 
-            int parHandle = 0;
-            int.TryParse(msg, out parHandle);
-
-            if (parHandle == 0)
+        private void SetupParentWindow()
+        {
+            if (!ParseWindowInfo(out int parHandle, out string strwidth, out string strheight))
             {
                 return;
             }
@@ -209,60 +332,78 @@ namespace TestAvalonia
 #endif
         }
 
-#if WINDOWS
+        private const int MaxRetries = 10;
+        private const int RetryDelay = 50; // 毫秒
+
         private void SetupParentWindowWithRetry(int retryCount = 0)
         {
-            const int maxRetries = 10;
-            const int retryDelay = 50; // 毫秒
-
-            if (retryCount >= maxRetries)
+            if (retryCount >= MaxRetries)
             {
                 AddStatusMessage("设置父窗口失败：超过最大重试次数");
+#if LINUX
+                // 避免一直保持透明，重试失败后至少要把窗口显示出来
+                try
+                {
+                    this.Opacity = 1;
+                }
+                catch { }
+#endif
+                return;
+            }
+
+#if WINDOWS
+            Dispatcher.UIThread.Post(() =>
+            {
+                curHwnd = GetWindowHandle();
+                if (curHwnd == IntPtr.Zero)
+                {
+                    RetryAfterDelay(() => SetupParentWindowWithRetry(retryCount + 1));
+                    return;
+                }
+                TrySetupParentWindow();
+            }, DispatcherPriority.Loaded);
+#elif LINUX
+            if (!ParseWindowInfo(out int parHandle, out string strwidth, out string strheight))
+            {
                 return;
             }
 
             Dispatcher.UIThread.Post(() =>
             {
-                // 尝试获取窗口句柄
-                curHwnd = GetWindowHandle();
-                if (curHwnd == IntPtr.Zero)
+                curX11Window = GetX11WindowHandle();
+                if (curX11Window == 0)
                 {
-                    // 如果获取失败，延迟重试
-                    Task.Delay(retryDelay).ContinueWith(_ =>
-                    {
-                        SetupParentWindowWithRetry(retryCount + 1);
-                    });
+                    RetryAfterDelay(() => SetupParentWindowWithRetry(retryCount + 1));
                     return;
                 }
-
-                // 窗口句柄已获取，尝试设置父窗口
-                TrySetupParentWindow();
+                SetupParentWindowLinux(parHandle, strwidth, strheight, retryCount);
             }, DispatcherPriority.Loaded);
-        }
+#else
+            // macOS 平台：暂不支持
+            AddStatusMessage("macOS 平台的窗口嵌入功能需要额外实现");
 #endif
+        }
+
+        private void RetryAfterDelay(Action retryAction)
+        {
+            Task.Delay(RetryDelay).ContinueWith(_ => retryAction());
+        }
+
+        private void SetWindowStyleProperties()
+        {
+            this.WindowState = WindowState.Normal;
+            this.CanResize = false;
+            this.ShowInTaskbar = false;
+#if LINUX
+            // Linux 下作为嵌入子窗口显示时，尽量去掉系统边框，减少闪烁/黑框
+            this.SystemDecorations = SystemDecorations.None;
+#endif
+        }
 
 #if WINDOWS
         private void TrySetupParentWindow()
         {
-            if (string.IsNullOrEmpty(_wndInfo))
-            {
-                return;
-            }
-
-            string[] parts = _wndInfo.Split('|');
-            if (parts.Length < 3)
-            {
-                return;
-            }
-
-            string msg = parts[0];
-            string strwidth = parts[1];
-            string strheight = parts[2];
-
-            int parHandle = 0;
-            int.TryParse(msg, out parHandle);
-
-            if (parHandle == 0)
+            if (!ParseWindowInfo(out int parHandle, out string strwidth, out string strheight))
             {
                 return;
             }
@@ -276,7 +417,7 @@ namespace TestAvalonia
                     // 如果获取失败，延迟重试
                     Dispatcher.UIThread.Post(() =>
                     {
-                        Task.Delay(50).ContinueWith(_ =>
+                        RetryAfterDelay(() =>
                         {
                             Dispatcher.UIThread.Post(() => TrySetupParentWindow(), DispatcherPriority.Loaded);
                         });
@@ -325,9 +466,7 @@ namespace TestAvalonia
                 SetWindowLong(curHwnd, -20, lPreExStyle);
 
                 // 设置窗口样式属性（在 SetParent 之前设置，避免窗口管理器干扰）
-                this.WindowState = WindowState.Normal;
-                this.CanResize = false;
-                this.ShowInTaskbar = false;
+                SetWindowStyleProperties();
 
                 // 设置父窗口（关键步骤）
                 // 注意：SetParent 的参数类型，TestWpf 中使用的是 int，这里使用 IntPtr
@@ -366,9 +505,7 @@ namespace TestAvalonia
                 }
 
                 // 设置窗口样式属性
-                this.WindowState = WindowState.Normal;
-                this.CanResize = false;
-                this.ShowInTaskbar = false;
+                SetWindowStyleProperties();
 
                 // 设置窗口大小和位置
                 if (width > 0 && height > 0)
@@ -430,13 +567,60 @@ namespace TestAvalonia
 #endif
 
 #if LINUX
-        private void SetupParentWindowLinux(int parHandle, string strwidth, string strheight)
+        private void SetupParentWindowLinux(int parHandle, string strwidth, string strheight, int retryCount = 0)
         {
             // Linux 平台：使用 X11 API 设置父窗口
             Dispatcher.UIThread.Post(() =>
             {
                 try
                 {
+                    // 如果已经成功嵌入过一次，只需要根据父窗口或命令行尺寸做一次对齐即可，避免重复 Reparent 造成闪烁
+                    if (_x11Embedded)
+                    {
+                        // 解析命令行给的尺寸（已嵌入场景使用单独变量名，避免与后续局部变量冲突）
+                        double embeddedWidth = 0;
+                        double.TryParse(strwidth, out embeddedWidth);
+                        double embeddedHeight = 0;
+                        double.TryParse(strheight, out embeddedHeight);
+
+                        ulong parentWindowIdForSize = (ulong)parHandle;
+                        int targetW = (int)embeddedWidth;
+                        int targetH = (int)embeddedHeight;
+
+                        try
+                        {
+                            if (x11Display != null && x11Display != IntPtr.Zero && parentWindowIdForSize != 0)
+                            {
+                                if (XGetGeometry(x11Display.Value, parentWindowIdForSize,
+                                        out _, out _, out _,
+                                        out uint pw2, out uint ph2,
+                                        out _, out _) != 0)
+                                {
+                                    if (pw2 > 0 && ph2 > 0)
+                                    {
+                                        targetW = (int)pw2;
+                                        targetH = (int)ph2;
+                                    }
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // ignore, fall back to命令行宽高
+                        }
+
+                        if (curX11Window != 0 && x11Display != null && x11Display != IntPtr.Zero &&
+                            targetW > 0 && targetH > 0)
+                        {
+                            XMoveResizeWindow(x11Display.Value, curX11Window, 0, 0, targetW, targetH);
+                            XFlush(x11Display.Value);
+                            this.Width = targetW;
+                            this.Height = targetH;
+                            AddStatusMessage($"已在已嵌入状态下对齐窗口大小: {this.Width}x{this.Height}");
+                        }
+                        return;
+                    }
+
                     // 获取当前窗口的 X11 窗口 ID
                     curX11Window = GetX11WindowHandle();
                     if (curX11Window == 0)
@@ -465,19 +649,71 @@ namespace TestAvalonia
                     // 将父窗口句柄转换为 ulong（X11 窗口 ID）
                     ulong parentWindowId = (ulong)parHandle;
 
+                    // 保护性检查：如果父窗口就是桌面 RootWindow，说明宿主传来的不是实际容器窗口。
+                    // 这种情况下，继续使用宿主自己的嵌入逻辑，只在后续 setsize 时按通知调整大小，避免把窗口直接挂到桌面上。
+                    ulong rootWindowId = XDefaultRootWindow(x11Display.Value);
+                    if (parentWindowId == 0 || parentWindowId == rootWindowId)
+                    {
+                        AddStatusMessage($"检测到父窗口句柄为 RootWindow(或 0)，跳过 XReparent，避免嵌入到桌面。parent={parentWindowId}, root={rootWindowId}");
+                        // 仍然应用无边框/样式，后续通过 setsize 通知调整大小
+                        SetWindowStyleProperties();
+                        try
+                        {
+                            this.Opacity = 1;
+                        }
+                        catch { }
+                        return;
+                    }
+
+                    // 先隐藏当前窗口，避免“黑框闪一下”（窗口先作为顶级窗口显示一帧）
+                    // X11 的 reparent/resize 是异步的，先 Unmap 再操作可减少闪烁
+                    try
+                    {
+                        this.Opacity = 0;
+                    }
+                    catch
+                    {
+                        // 某些平台/渲染后端可能不支持 Opacity，忽略
+                    }
+                    XUnmapWindow(x11Display.Value, curX11Window);
+                    XFlush(x11Display.Value);
+
                     // 设置窗口无边框
                     XSetWindowBorderWidth(x11Display.Value, curX11Window, 0);
 
                     // 重新设置父窗口
                     int result = XReparentWindow(x11Display.Value, curX11Window, parentWindowId, 0, 0);
-                    if (result == 0)
+                    // XReparentWindow 返回 Status：非 0 通常表示 Success
+                    if (result != 0)
                     {
-                        // 设置窗口大小和位置
-                        if (width > 0 && height > 0)
+                        // 优先使用父窗口实时几何尺寸（更可靠），其次使用命令行传入尺寸
+                        int targetW = (int)width;
+                        int targetH = (int)height;
+                        try
                         {
-                            XMoveResizeWindow(x11Display.Value, curX11Window, 0, 0, (int)width, (int)height);
-                            this.Width = width;
-                            this.Height = height;
+                            if (XGetGeometry(x11Display.Value, parentWindowId,
+                                    out _, out _, out _,
+                                    out uint pw, out uint ph,
+                                    out _, out _) != 0)
+                            {
+                                if (pw > 0 && ph > 0)
+                                {
+                                    targetW = (int)pw;
+                                    targetH = (int)ph;
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // 获取失败则回落到命令行尺寸
+                        }
+
+                        // 设置窗口大小和位置
+                        if (targetW > 0 && targetH > 0)
+                        {
+                            XMoveResizeWindow(x11Display.Value, curX11Window, 0, 0, targetW, targetH);
+                            this.Width = targetW;
+                            this.Height = targetH;
                         }
 
                         // 显示窗口
@@ -485,15 +721,37 @@ namespace TestAvalonia
                         XFlush(x11Display.Value);
 
                         // 设置窗口样式属性
-                        this.WindowState = WindowState.Normal;
-                        this.CanResize = false;
-                        this.ShowInTaskbar = false;
+                        SetWindowStyleProperties();
 
-                        AddStatusMessage($"窗口已嵌入父窗口 (X11 ID: {parentWindowId}), 大小: {width}x{height}");
+                        try
+                        {
+                            this.Opacity = 1;
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+
+                        AddStatusMessage($"窗口已嵌入父窗口 (X11 ID: {parentWindowId}), 大小: {this.Width}x{this.Height}");
+                        _x11Embedded = true;
                     }
                     else
                     {
-                        AddStatusMessage($"XReparentWindow 失败，返回码: {result}");
+                        AddStatusMessage($"XReparentWindow 失败，返回码: {result}，retry={retryCount}");
+
+                        if (retryCount + 1 < MaxRetries)
+                        {
+                            // 使用统一的重试通道，稍后再次尝试嵌入，避免父窗口尚未就绪导致的偶发失败
+                            RetryAfterDelay(() => SetupParentWindowLinux(parHandle, strwidth, strheight, retryCount + 1));
+                        }
+                        else
+                        {
+                            try
+                            {
+                                this.Opacity = 1;
+                            }
+                            catch { }
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -504,40 +762,53 @@ namespace TestAvalonia
         }
 #endif
 
-        private IntPtr GetWindowHandle()
+        // 通用的窗口句柄获取逻辑（通过反射）
+        private IPlatformHandle? GetPlatformHandleByReflection()
         {
-#if WINDOWS
-            // 获取 Avalonia 窗口句柄（Windows 平台）
             try
             {
                 // 方法1: 使用 TryGetPlatformHandle 扩展方法（推荐方式）
                 var platformHandle = this.TryGetPlatformHandle();
                 if (platformHandle != null)
                 {
-                    return platformHandle.Handle;
+                    return platformHandle;
                 }
 
                 // 方法2: 尝试通过 PlatformImpl 获取
                 if (this.PlatformImpl != null)
                 {
-                    // 使用反射获取 Handle 属性
                     var handleProperty = this.PlatformImpl.GetType().GetProperty("Handle",
                         BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
                     if (handleProperty != null)
                     {
                         var handle = handleProperty.GetValue(this.PlatformImpl);
-                        if (handle is IPlatformHandle platformHandle2)
+                        if (handle is IPlatformHandle ph)
                         {
-                            return platformHandle2.Handle;
-                        }
-                        else if (handle is IntPtr ptr && ptr != IntPtr.Zero)
-                        {
-                            return ptr;
+                            return ph;
                         }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                AddStatusMessage($"获取窗口句柄时出错: {ex.Message}");
+            }
+            return null;
+        }
 
-                // 方法3: 尝试通过反射获取 WindowImpl 的 Handle
+        private IntPtr GetWindowHandle()
+        {
+#if WINDOWS
+            // 获取 Avalonia 窗口句柄（Windows 平台）
+            var platformHandle = GetPlatformHandleByReflection();
+            if (platformHandle != null)
+            {
+                return platformHandle.Handle;
+            }
+
+            // 方法3: 尝试通过反射获取 WindowImpl 的 Handle（Windows特定）
+            try
+            {
                 if (this.PlatformImpl != null)
                 {
                     var platformImplType = this.PlatformImpl.GetType();
@@ -570,39 +841,10 @@ namespace TestAvalonia
         private ulong GetX11WindowHandle()
         {
             // 获取 Avalonia 窗口的 X11 窗口 ID
-            try
+            var platformHandle = GetPlatformHandleByReflection();
+            if (platformHandle != null)
             {
-                // 方法1: 尝试通过 PlatformImpl 获取
-                if (this.PlatformImpl != null)
-                {
-                    // 使用反射获取窗口句柄
-                    var handleProperty = this.PlatformImpl.GetType().GetProperty("Handle",
-                        BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-                    if (handleProperty != null)
-                    {
-                        var handle = handleProperty.GetValue(this.PlatformImpl);
-                        if (handle is IPlatformHandle platformHandle)
-                        {
-                            // X11 窗口 ID 是 Handle 的值（ulong）
-                            return (ulong)platformHandle.Handle.ToInt64();
-                        }
-                        else if (handle is IntPtr ptr && ptr != IntPtr.Zero)
-                        {
-                            return (ulong)ptr.ToInt64();
-                        }
-                    }
-                }
-
-                // 方法2: 尝试通过扩展方法获取
-                var platformHandle2 = this.TryGetPlatformHandle();
-                if (platformHandle2 != null)
-                {
-                    return (ulong)platformHandle2.Handle.ToInt64();
-                }
-            }
-            catch (Exception ex)
-            {
-                AddStatusMessage($"获取 X11 窗口 ID 失败: {ex.Message}");
+                return (ulong)platformHandle.Handle.ToInt64();
             }
             return 0;
         }
@@ -835,6 +1077,17 @@ namespace TestAvalonia
             }
         }
 
+        // 创建RPC请求的辅助方法
+        private RpcRequest CreateRpcRequest(string method, JObject? param = null)
+        {
+            return new RpcRequest
+            {
+                id = Guid.NewGuid().ToString(),
+                method = method,
+                param = param
+            };
+        }
+
         private void Connect()
         {
             string log_path = "test_rpc_avalonia.log";   // 管道日志文件
@@ -855,10 +1108,7 @@ namespace TestAvalonia
             AddStatusMessage($"✓ 连接成功: {_pipeName}");
 
             // 发送初始化消息
-            RpcRequest request = new RpcRequest();
-            request.id = Guid.NewGuid().ToString();
-            request.method = "init_succ";
-            wrapper?.Notify(request);
+            wrapper?.Notify(CreateRpcRequest("init_succ"));
         }
 
         private void Button_Click(object? sender, RoutedEventArgs e)
@@ -874,10 +1124,7 @@ namespace TestAvalonia
                         {
                             if (_pipeSucc)
                             {
-                                RpcRequest request = new RpcRequest();
-                                request.id = Guid.NewGuid().ToString();
-                                request.method = "notf_sub";
-                                wrapper?.Notify(request);
+                                wrapper?.Notify(CreateRpcRequest("notf_sub"));
                                 AddStatusMessage("✓ Notify 发送成功");
                             }
                             else
@@ -958,11 +1205,7 @@ namespace TestAvalonia
 
         private async Task TestMethodInvokeAsync()
         {
-            RpcRequest request = new RpcRequest();
-            request.id = Guid.NewGuid().ToString();
-            request.method = "test_invoke_async";
-
-            var (ret, response) = await wrapper.InvokeAsync(request);
+            var (ret, response) = await wrapper.InvokeAsync(CreateRpcRequest("test_invoke_async"));
             if (RET_CALL.Ok == (RET_CALL)ret)
             {
                 AddStatusMessage("✓ 异步 Invoke 成功");
@@ -977,12 +1220,8 @@ namespace TestAvalonia
 
         private void TestMethodInvoke()
         {
-            RpcRequest request = new RpcRequest();
-            request.id = Guid.NewGuid().ToString();
-            request.method = "test_invoke";
             RpcResponse response = new RpcResponse();
-
-            int ret = wrapper.Invoke(request, out response, 30000);
+            int ret = wrapper.Invoke(CreateRpcRequest("test_invoke"), out response, 30000);
             if (RET_CALL.Ok == (RET_CALL)ret)
             {
                 AddStatusMessage("✓ 同步 Invoke 成功");
@@ -999,10 +1238,8 @@ namespace TestAvalonia
         {
             if (wrapper is not null)
             {
-                RpcRequest request = new RpcRequest();
-                request.method = "requestTheme";
                 RpcResponse response = new RpcResponse();
-                int ret = wrapper.Invoke(request, out response);
+                int ret = wrapper.Invoke(CreateRpcRequest("requestTheme"), out response);
                 if (ret == 1 && response.code == 0)
                 {
                     theme = response.result?["theme"]?.ToString();
@@ -1020,10 +1257,8 @@ namespace TestAvalonia
         {
             if (wrapper is not null)
             {
-                RpcRequest request = new RpcRequest();
-                request.method = "requestThemeRes";
                 RpcResponse response = new RpcResponse();
-                int ret = wrapper.Invoke(request, out response);
+                int ret = wrapper.Invoke(CreateRpcRequest("requestThemeRes"), out response);
                 if (ret == 1 && response.code == 0)
                 {
                     string outputMessage = response.result?.ToString() ?? "";
@@ -1051,58 +1286,47 @@ namespace TestAvalonia
             AddStatusMessage($"应用主题: {themeName}");
         }
 
-        private async void Button_Click_1(object? sender, RoutedEventArgs e)
+        private async Task HandleWidgetRequest(string group, InvokeType invokeType, bool isInvoke)
         {
-            RpcRequest request = new RpcRequest();
-            request.method = "textchanged";
-            request.param = new JObject()
+            var request = CreateRpcRequest("textchanged", new JObject
             {
                 ["text"] = edit_content.Text ?? ""
-            };
-            
-            if (comType.SelectedIndex == 0)
+            });
+
+            if (isInvoke)
             {
-                var response = await wrapper.InvokeWidget(edit_group.Text ?? "", InvokeType.Global, request, false);
+                var response = await wrapper.InvokeWidget(group, invokeType, request, false);
                 if ((RET_CALL)response.ret == RET_CALL.Ok)
                 {
                     var res = response.response;
-                    AddStatusMessage($"全局请求成功: {res.result}");
+                    string typeName = invokeType == InvokeType.Global ? "全局" : "组";
+                    AddStatusMessage($"{typeName}请求成功: {res.result}");
                 }
             }
             else
             {
-                wrapper.NotifyWidget(edit_group.Text ?? "", InvokeType.Global, request, false);
-                AddStatusMessage("全局通知已发送");
+                wrapper.NotifyWidget(group, invokeType, request, false);
+                string typeName = invokeType == InvokeType.Global ? "全局" : "组";
+                AddStatusMessage($"{typeName}通知已发送");
             }
+        }
+
+        private async void Button_Click_1(object? sender, RoutedEventArgs e)
+        {
+            await HandleWidgetRequest(edit_group.Text ?? "", InvokeType.Global, comType.SelectedIndex == 0);
         }
 
         private async void Button_Click_2(object? sender, RoutedEventArgs e)
         {
-            RpcRequest request = new RpcRequest();
-            request.method = "textchanged";
-            request.param = new JObject()
-            {
-                ["text"] = edit_content.Text ?? ""
-            };
-            
-            if (comType.SelectedIndex == 0)
-            {
-                var response = await wrapper.InvokeWidget(edit_group.Text ?? "", InvokeType.Group, request, false);
-                if ((RET_CALL)response.ret == RET_CALL.Ok)
-                {
-                    var res = response.response;
-                    AddStatusMessage($"组请求成功: {res.result}");
-                }
-            }
-            else
-            {
-                wrapper.NotifyWidget(edit_group.Text ?? "", InvokeType.Group, request, false);
-                AddStatusMessage("组通知已发送");
-            }
+            await HandleWidgetRequest(edit_group.Text ?? "", InvokeType.Group, comType.SelectedIndex == 0);
         }
 
         private void AddStatusMessage(string message)
         {
+            // 写入日志文件
+            WriteToLogFile(message);
+
+            // 更新UI显示
             Dispatcher.UIThread.Post(() =>
             {
                 if (statusText != null)
@@ -1113,6 +1337,33 @@ namespace TestAvalonia
                     scrollViewer?.ScrollToEnd();
                 }
             });
+        }
+
+        private void WriteToLogFile(string message)
+        {
+            try
+            {
+                lock (_logFileLock)
+                {
+                    if (_logFileWriter != null)
+                    {
+                        _logFileWriter.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - {message}");
+                        _logFileWriter.Flush(); // 强制刷新，确保立即写入磁盘
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // 日志写入失败时，尝试写入备用日志文件
+                try
+                {
+                    string backupLogPath = "test_avalonia_status_backup.log";
+                    File.AppendAllText(backupLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}\n");
+                    File.AppendAllText(backupLogPath, $"[错误] 主日志写入失败: {ex.Message}\n");
+                }
+                catch { }
+                System.Diagnostics.Debug.WriteLine($"写入日志文件失败: {ex.Message}");
+            }
         }
 
         private async void ShowMessage(string title, string message)
@@ -1170,8 +1421,33 @@ namespace TestAvalonia
                 x11Display = null;
             }
 #endif
+            // 关闭日志文件
+            CloseLogFile();
+            
             wrapper?.Exit();
             base.OnClosed(e);
+        }
+
+        private void CloseLogFile()
+        {
+            try
+            {
+                lock (_logFileLock)
+                {
+                    if (_logFileWriter != null)
+                    {
+                        _logFileWriter.WriteLine($"========== 日志结束 {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==========");
+                        _logFileWriter.WriteLine(); // 空行分隔
+                        _logFileWriter.Close();
+                        _logFileWriter.Dispose();
+                        _logFileWriter = null;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"关闭日志文件失败: {ex.Message}");
+            }
         }
     }
 }
