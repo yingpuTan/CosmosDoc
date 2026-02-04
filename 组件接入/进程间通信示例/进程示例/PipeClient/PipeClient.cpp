@@ -3,8 +3,8 @@
 #include "app.h"
 #include <sstream>
 #include <iomanip>
-#include <iostream>
 #include <list>
+#include <vector>
 
 #define HEADER_SIZE 64
 #define ACTION_SIZE 4
@@ -141,31 +141,100 @@ bool PipeClient::Connect()
 	
 	// Handle pipe name format: C# (.NET 7) may use just the name or full path
 	std::string socketPath = _pipeName;
-	if (socketPath.find('/') == std::string::npos) {
-		// If no path separator, assume it's just a name
-		// .NET 7 NamedPipeServerStream on Linux creates socket files like:
-		// /tmp/.NET-Core-Pipe-{name}-{pid}-{random} or /tmp/{name}
-		// Try /tmp/{name} first (simpler format)
+	std::string pipeNameOnly = _pipeName;
+	
+	// Extract pipe name only (without path)
+	if (socketPath.find('/') != std::string::npos) {
+		// Full path provided, use as-is
+		size_t lastSlash = socketPath.find_last_of('/');
+		pipeNameOnly = socketPath.substr(lastSlash + 1);
+	} else {
+		// Just a name, need to construct path
 		socketPath = "/tmp/" + socketPath;
 	}
 	
-	// .NET 7 NamedPipeServerStream on Linux creates socket files with specific naming
-	// The actual socket file might be: /tmp/.NET-Core-Pipe-{name}-{pid}-{random}
-	// But when connecting, we can use the simple name and let the system resolve it
-	// If connection fails, the user should check the actual socket file path
-	strncpy(addr.sun_path, socketPath.c_str(), sizeof(addr.sun_path) - 1);
-	addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
-
-	if (connect(_pipeHandle, (struct sockaddr*)&addr, sizeof(addr)) == -1)
-	{
+	// Try multiple socket path formats (for compatibility with different .NET Core versions)
+	// Format 1: /tmp/{name} (simple format)
+	// Format 2: /tmp/CoreFxPipe_{name} (信创系统格式)
+	// Format 3: /tmp/.NET-Core-Pipe-{name}-* (with pid and random suffix, need to search)
+	
+	std::vector<std::string> pathsToTry;
+	if (socketPath.find('/') != std::string::npos && socketPath.find("/tmp/") == 0) {
+		// Already has /tmp/ prefix, try as-is first
+		pathsToTry.push_back(socketPath);
+		// Also try CoreFxPipe_ prefix version
+		pathsToTry.push_back("/tmp/CoreFxPipe_" + pipeNameOnly);
+	} else {
+		// Try simple format first
+		pathsToTry.push_back("/tmp/" + pipeNameOnly);
+		// Then try CoreFxPipe_ prefix format (信创系统)
+		pathsToTry.push_back("/tmp/CoreFxPipe_" + pipeNameOnly);
+	}
+	
+	bool connected = false;
+	std::string successfulPath;
+	
+	for (const auto& path : pathsToTry) {
+		memset(&addr, 0, sizeof(addr));
+		addr.sun_family = AF_UNIX;
+		strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
+		addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
+		
+		if (connect(_pipeHandle, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+			connected = true;
+			successfulPath = path;
+			break;
+		}
+	}
+	
+	// If still not connected, try to find socket file in /tmp directory
+	if (!connected) {
+		// Close the failed socket and create a new one
+		close(_pipeHandle);
+		_pipeHandle = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (_pipeHandle != INVALID_PIPE_HANDLE) {
+			DIR* dir = opendir("/tmp");
+			if (dir != nullptr) {
+				struct dirent* entry;
+				std::string prefix1 = "CoreFxPipe_" + pipeNameOnly;
+				std::string prefix2 = ".NET-Core-Pipe-" + pipeNameOnly + "-";
+				
+				while ((entry = readdir(dir)) != nullptr) {
+					std::string filename = entry->d_name;
+					
+					// Check if filename matches CoreFxPipe_{name} or starts with .NET-Core-Pipe-{name}-
+					if (filename == prefix1 || 
+					    filename == pipeNameOnly ||
+					    (filename.find(prefix2) == 0)) {
+						std::string foundPath = std::string("/tmp/") + filename;
+						
+						memset(&addr, 0, sizeof(addr));
+						addr.sun_family = AF_UNIX;
+						strncpy(addr.sun_path, foundPath.c_str(), sizeof(addr.sun_path) - 1);
+						addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
+						
+						if (connect(_pipeHandle, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+							connected = true;
+							successfulPath = foundPath;
+							break;
+						}
+					}
+				}
+				closedir(dir);
+			}
+		}
+	}
+	
+	if (!connected) {
 		int err = errno;
-		app::RecordInfo("Err-connect failed errcode: %d  pipename: %s (tried: %s)", err, _pipeName.c_str(), socketPath.c_str());
+		app::RecordInfo("Err-connect failed errcode: %d  pipename: %s (tried: %s, CoreFxPipe_%s, and searched /tmp)", 
+		                err, _pipeName.c_str(), pathsToTry[0].c_str(), pipeNameOnly.c_str());
 		close(_pipeHandle);
 		_pipeHandle = INVALID_PIPE_HANDLE;
 		return false;
 	}
 
-	app::RecordInfo("Info-connect success pipename: %s (socket: %s)", _pipeName.c_str(), socketPath.c_str());
+	app::RecordInfo("Info-connect success pipename: %s (socket: %s)", _pipeName.c_str(), successfulPath.c_str());
 #endif
 
 	_connected  = true;
