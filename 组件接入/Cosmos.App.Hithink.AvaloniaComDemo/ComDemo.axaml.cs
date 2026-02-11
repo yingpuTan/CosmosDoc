@@ -1,4 +1,4 @@
-﻿using Cosmos.App.Sdk.v1;
+using Cosmos.App.Sdk.v1;
 using Cosmos.App.Sdk.v1.Primitives;
 using Cosmos.DataAccess.Trade.v1;
 using Cosmos.DataAccess.Trade.v1.Protocol;
@@ -9,33 +9,23 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.Emit;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Unicode;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using System.Security.Principal;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Cosmos.App.Hithink.Demo.Shared;
+using Avalonia.Threading;
+using static Cosmos.App.Hithink.AvaloniaComDemo.AvaloniaComDemoGui;
+using PushHandler = ISubscriberRaw<string, string, string, string, string, int>.PushDataHandler;
 
-namespace Cosmos.App.Hithink.ComDemo
+namespace Cosmos.App.Hithink.AvaloniaComDemo
 {
-    using static Cosmos.App.Hithink.ComDemo.WpfComDemoGui;
-    using PushHandler = ISubscriberRaw<string, string, string, string, string, int>.PushDataHandler;
-
     /// <summary>
-    /// Interaction logic for ComDemo.xaml
+    /// Interaction logic for ComDemo.axaml
     /// </summary>
     public partial class ComDemo : UserControl
     {
@@ -53,15 +43,13 @@ namespace Cosmos.App.Hithink.ComDemo
             _tradeDataAccessor.DataProvider.SubscribAppCommand((object sender, IAppRecommand pushResult) =>
             {
                 string content = $"AppGuid：{pushResult.AppGuid}，AppName：{pushResult.AppName}, Content:{pushResult.Content}";
-                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                Dispatcher.UIThread.Post(() =>
                 {
                     lab_higate.Content = content;
-                }));
-                
-                // Console.WriteLine($"AppGuid：{pushResult.AppGuid}，AppName：{pushResult.AppName}, Content:{pushResult.Content}");
+                });
             });
 
-             //订阅连接是否断开
+            //订阅连接是否断开
             _tradeDataAccessor.DataSessionController.TradeStatusChanged += DataSessionController_TradeStatusChanged;
 
             text_name.TextChanged += (sender, e) =>
@@ -70,7 +58,7 @@ namespace Cosmos.App.Hithink.ComDemo
                 var textBox = sender as TextBox;
                 if (textBox != null)
                 {
-                    foreach(var kvp in dicTextChange)
+                    foreach (var kvp in dicTextChange)
                     {
                         String strUUid = kvp.Key;
                         var handle = kvp.Value;
@@ -79,7 +67,7 @@ namespace Cosmos.App.Hithink.ComDemo
                             string strSubscriberid = dicTextSub[strUUid];
                             TextChange textPush = new TextChange()
                             {
-                                text = textBox.Text
+                                text = textBox.Text ?? string.Empty
                             };
                             /// 触发回调,通知订阅者文本框发生改变
                             handle(strSubscriberid, strUUid, JsonSerializer.Serialize<TextChange>(textPush));
@@ -93,7 +81,7 @@ namespace Cosmos.App.Hithink.ComDemo
             dueTime: TimeSpan.FromMilliseconds(1000),
             period: TimeSpan.FromMilliseconds(10)
         );
-        _timer.Change(Timeout.Infinite, 0);
+            _timer.Change(Timeout.Infinite, 0);
 
         }
         private string _method_type;
@@ -139,7 +127,7 @@ namespace Cosmos.App.Hithink.ComDemo
                 ["text38"] = "1111111111111111111111111111111test1111111111111111111111111111111test1111111111111111111111111111111test1111111111111111111111111111111test",
 
             };
-            InvokeType type = _send_type ==  "broadcast" ? InvokeType.Global : InvokeType.Group;
+            InvokeType type = _send_type == "broadcast" ? InvokeType.Global : InvokeType.Group;
             if (_method_type == "invoke")
             //发送请求
             {
@@ -151,34 +139,17 @@ namespace Cosmos.App.Hithink.ComDemo
                 var result = _contextInjection.ThisAppContext.GlobalContexts.EngineContext.BusinessRequest.NotifyWidget(null, type, request, false);
             }
             return;
-
-            // 后台线程执行，需通过 Dispatcher 更新 UI
-            Dispatcher.Invoke(() => {
-              
-               //发送请求
-               //if (comuType.SelectedIndex == 0)
-               //{
-               //    var result = _contextInjection.ThisAppContext.GlobalContexts.EngineContext.BusinessRequest.InvokeWidget(null, InvokeType.Global, request, false);
-               //}
-               ////发送通知
-               //else
-               //{
-               //    _contextInjection.ThisAppContext.GlobalContexts.EngineContext.BusinessRequest.NotifyWidget(null, InvokeType.Global, request, false);
-               //}
-           });
-            
-
         }
         private void DataSessionController_TradeStatusChanged(object? sender, TradeDataSessionStatus e)
         {
             //已连接
-            if(e == TradeDataSessionStatus.Running)
+            if (e == TradeDataSessionStatus.Running)
             {
                 //处理查询或者重新订阅数据
                 _logger?.Log(CosmosLogLevel.Information, "已连接");
             }
             //断开连接
-            else if(e == TradeDataSessionStatus.Stopped)
+            else if (e == TradeDataSessionStatus.Stopped)
             {
                 _logger?.Log(CosmosLogLevel.Information, "已断开");
 
@@ -197,7 +168,7 @@ namespace Cosmos.App.Hithink.ComDemo
         /// <returns>文本输入框内容</returns>
         public String GetText()
         {
-            return text_name.Text;
+            return text_name.Text ?? string.Empty;
         }
 
         /// <summary>
@@ -209,6 +180,7 @@ namespace Cosmos.App.Hithink.ComDemo
         {
             String strUUid = Guid.NewGuid().ToString();
             dicTextChange[strUUid] = pushDataHandler;
+            dicTextSub[strUUid] = subscriberId;
             return strUUid;
         }
 
@@ -229,7 +201,7 @@ namespace Cosmos.App.Hithink.ComDemo
         {
             text_name.Text = str;
         }
-        private void btn_get_Click(object sender, RoutedEventArgs e)
+        private void btn_get_Click(object? sender, RoutedEventArgs e)
         {
             Task.Factory.StartNew(async () =>
             {
@@ -238,7 +210,10 @@ namespace Cosmos.App.Hithink.ComDemo
                 {
                     String strSelfSotck = String.Join(',', queryResult.AssetIds);
                     _logger?.Log(CosmosLogLevel.Information, $"获取到自选股列表：{strSelfSotck}");
-                    text_selfstock.Text = strSelfSotck;
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        text_selfstock.Text = strSelfSotck;
+                    });
                 }
             });
         }
@@ -248,24 +223,24 @@ namespace Cosmos.App.Hithink.ComDemo
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private async void btn_send_msg_Click(object sender, RoutedEventArgs e)
+        private async void btn_send_msg_Click(object? sender, RoutedEventArgs e)
         {
             ///获取当前实例唯一标识
             var cosmosOperator = Convert.ToString(_contextInjection.ThisInstanceContext.InstanceId);
             TextChange textInvoke = new TextChange()
             {
-                text = text_name.Text
+                text = text_name.Text ?? string.Empty
             };
             //向宿主调用comTestSetText方法,需要宿主实现该方法
             string result = await _productAccessor.InvokeAsync(cosmosOperator, "comTestSetText", JsonSerializer.Serialize<TextChange>(textInvoke));
-            WpfToast.Show("发送完成");
+            AvaloniaToast.Show("发送完成");
         }
         /// <summary>
         /// 
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private async void btn_sub_higate_Click(object sender, RoutedEventArgs e)
+        private async void btn_sub_higate_Click(object? sender, RoutedEventArgs e)
         {
             /// 调用第三方订阅接口
             ISubscribeParameters subscribeParameters = _tradeDataAccessor.DataProvider.CreateSubscribeParameters();
@@ -279,14 +254,14 @@ namespace Cosmos.App.Hithink.ComDemo
                 _logger?.Log(CosmosLogLevel.Information, $" RecvPushData :{pushResult.data}");
             });
 
-            if(pushsubscribetion_.code != 0)
+            if (pushsubscribetion_.code != 0)
             {
-                WpfToast.Show($"订阅失败 msg:{pushsubscribetion_.msg}", CosmosLogLevel.Error);
+                AvaloniaToast.Show($"订阅失败 msg:{pushsubscribetion_.msg}", CosmosLogLevel.Error);
                 _logger?.Log(CosmosLogLevel.Error, $"订阅失败 msg:{pushsubscribetion_.msg}");
             }
             else
             {
-                WpfToast.Show("订阅higate完成");
+                AvaloniaToast.Show("订阅higate完成");
                 _logger?.Log(CosmosLogLevel.Information, $"订阅higate成功 code:{pushsubscribetion_.code}, msg:{pushsubscribetion_.msg}");
             }
         }
@@ -296,9 +271,9 @@ namespace Cosmos.App.Hithink.ComDemo
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private async void btn_unsub_higate_Click(object sender, RoutedEventArgs e)
+        private async void btn_unsub_higate_Click(object? sender, RoutedEventArgs e)
         {
-            if (pushsubscribetion_!=null)
+            if (pushsubscribetion_ != null)
             {
                 /// 调用第三方取消订阅接口
                 IUnSubscribeParameters unsubscribeParameters = _tradeDataAccessor.DataProvider.CreateUnSubscribeParameters();
@@ -309,14 +284,14 @@ namespace Cosmos.App.Hithink.ComDemo
                 unsubscribeParameters.uuid = Guid.NewGuid().ToString();
 
                 var result = await _tradeDataAccessor.DataProvider.UnSubscribThirdModule(unsubscribeParameters, pushsubscribetion_);
-                if(result.code == 0)
+                if (result.code == 0)
                 {
-                    WpfToast.Show("取消订阅higate成功");
+                    AvaloniaToast.Show("取消订阅higate成功");
                     _logger?.Log(CosmosLogLevel.Information, "取消订阅higate成功");
                 }
                 else
                 {
-                    WpfToast.Show($"取消订阅失败 msg:{result.msg}", CosmosLogLevel.Error);
+                    AvaloniaToast.Show($"取消订阅失败 msg:{result.msg}", CosmosLogLevel.Error);
                     _logger?.Log(CosmosLogLevel.Error, $"取消订阅失败 msg:{result.msg}");
 
                 }
@@ -327,7 +302,7 @@ namespace Cosmos.App.Hithink.ComDemo
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private async void btn_req_higate_Click(object sender, RoutedEventArgs e)
+        private async void btn_req_higate_Click(object? sender, RoutedEventArgs e)
         {
             /// 调用第三方接口
             IThirdRequestParameters requestParameters = _tradeDataAccessor.DataProvider.CreateThirdRequestParameters();
@@ -345,33 +320,25 @@ namespace Cosmos.App.Hithink.ComDemo
                 )
             };
             JsonObject context = new JsonObject();
-            context["name"] = text_higate.Text;
+            context["name"] = text_higate.Text ?? string.Empty;
             requestParameters.Parameters = JsonSerializer.Serialize(context, options);
-
-            //同步等待应答
-           /* {
-                var result = await _tradeDataAccessor.DataProvider.ThirdModuleRequest(requestParameters);
-                _logger?.Log(CosmosLogLevel.Information, $"reqresult:{result.data} id : {result.uuid} code:{result.code}  msg:{result.msg} ");
-            }*/
 
             //异步不卡住界面
             {
-              
-               await _tradeDataAccessor.DataProvider.ThirdModuleRequestAsync(requestParameters, (object sender, IThirdResponse result) =>
-               {
-                   _logger?.Log(CosmosLogLevel.Information, $"reqresult:{result.data} id : {result.uuid} code:{result.code}  msg:{result.msg}");
-               });
+                await _tradeDataAccessor.DataProvider.ThirdModuleRequestAsync(requestParameters, (object sender, IThirdResponse result) =>
+                {
+                    _logger?.Log(CosmosLogLevel.Information, $"reqresult:{result.data} id : {result.uuid} code:{result.code}  msg:{result.msg}");
+                });
             }
 
         }
 
         // 组件快捷键注册处理示例
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private void Button_Click(object? sender, RoutedEventArgs e)
         {
-            if(String.IsNullOrEmpty(text_hotkey.Text))
+            if (String.IsNullOrEmpty(text_hotkey.Text))
             {
-                WpfToast.Show("请输入快捷键", CosmosLogLevel.Warning);
-                //return;
+                AvaloniaToast.Show("请输入快捷键", CosmosLogLevel.Warning);
             }
 
             //接受全局快捷键注册通知
@@ -425,7 +392,7 @@ namespace Cosmos.App.Hithink.ComDemo
                     // MOD_NOREPEAT 0x4000
                     // MOD_SHIFT    0x0004
                     // MOD_WIN      0x0008
-                    Modifiers = 1,  
+                    Modifiers = 1,
 
                     // 虚拟按键映射 参照windows Virtual-key-codes
                     Key = 66,
@@ -437,25 +404,25 @@ namespace Cosmos.App.Hithink.ComDemo
         }
 
 
-        private void btn_gettheme_Click(object sender, RoutedEventArgs e)
+        private void btn_gettheme_Click(object? sender, RoutedEventArgs e)
         {
             ///获取当前颜色主题
             var theme = _contextInjection.ThisAppContext.GlobalContexts.VisualContext.ColorScheme;
             text_theme.Text = theme.ToString();
         }
 
-        private void btn_getthemedic_Click(object sender, RoutedEventArgs e)
+        private void btn_getthemedic_Click(object? sender, RoutedEventArgs e)
         {
             ///获取当前主题的资源字典
             var dictionary = _contextInjection.ThisAppContext.GlobalContexts.VisualContext.ThemeResources;
             var text = Newtonsoft.Json.JsonConvert.SerializeObject(dictionary);
-            _logger?.Log(CosmosLogLevel.Information,$"ThemeResources:{text}");
+            _logger?.Log(CosmosLogLevel.Information, $"ThemeResources:{text}");
             text_theme.Text = text;
         }
 
         /// <summary>
         /// 行情数据访问器
-                                                                                                                                                                                                                                  /// </summary>
+        /// </summary>
         private IDataAccessor _dataAccessor { get; set; }
 
         private ITradeDataAccessor _tradeDataAccessor { get; set; }
@@ -485,17 +452,17 @@ namespace Cosmos.App.Hithink.ComDemo
 
         ITradeDataSubscription pushsubscribetion_;
 
-        private void btn_sendglobal_Click(object sender, RoutedEventArgs e)
+        private void btn_sendglobal_Click(object? sender, RoutedEventArgs e)
         {
             var request = _contextInjection.ThisAppContext.GlobalContexts.EngineContext.BusinessRequest.CreateRequestParameter();
             request.method = "textchanged";
             request.id = _contextInjection.ThisInstanceContext.Id;
             request.param = new JObject()
             {
-                ["text"] = text_sendcom.Text
+                ["text"] = text_sendcom.Text ?? string.Empty
             };
             //发送请求
-            if( comuType.SelectedIndex == 0 )
+            if (comuType.SelectedIndex == 0)
             {
                 var result = _contextInjection.ThisAppContext.GlobalContexts.EngineContext.BusinessRequest.InvokeWidget(null, InvokeType.Global, request, false);
             }
@@ -506,14 +473,14 @@ namespace Cosmos.App.Hithink.ComDemo
             }
         }
 
-        private void btn_sendcom_Click(object sender, RoutedEventArgs e)
+        private void btn_sendcom_Click(object? sender, RoutedEventArgs e)
         {
             var request = _contextInjection.ThisAppContext.GlobalContexts.EngineContext.BusinessRequest.CreateRequestParameter();
             request.method = "textchanged";
             request.id = _contextInjection.ThisInstanceContext.Id;
             request.param = new JObject()
             {
-                ["text"] = text_sendcom.Text
+                ["text"] = text_sendcom.Text ?? string.Empty
             };
 
             //发送请求
@@ -523,7 +490,7 @@ namespace Cosmos.App.Hithink.ComDemo
                 result.ContinueWith(t =>
                 {
                     var result = t.Result;
-                    var txt = $"WpfComDemoGui 接收到其他组件返回的invoke ,代码：{result.code} ，参数为 {result.result.ToString()}, 来源{result.id}";
+                    var txt = $"AvaloniaComDemoGui 接收到其他组件返回的invoke ,代码：{result.code} ，参数为 {result.result.ToString()}, 来源{result.id}";
                     ReceiveTxt(txt);
 
                 });
@@ -535,26 +502,29 @@ namespace Cosmos.App.Hithink.ComDemo
             }
         }
 
-        public void ReceiveTxt(string str)        {
+        public void ReceiveTxt(string str)
+        {
             string str_time = DateTime.Now.ToString() + ":";
             if (string.IsNullOrEmpty(str))
             {
                 str_time = "";
             }
-            this.Dispatcher.Invoke(new Action(() => {
-                text_receive.AppendText(str_time + str + Environment.NewLine); }));
+            Dispatcher.UIThread.Post(() =>
+            {
+                text_receive_content.Text += str_time + str + Environment.NewLine;
+            });
         }
-        private void btn_sendinstance_Click(object sender, RoutedEventArgs e)
+        private void btn_sendinstance_Click(object? sender, RoutedEventArgs e)
         {
 
         }
 
-        private void comuType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void comuType_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
             _method_type = (comuType.SelectedIndex == 0) ? "invoke" : "notify";
         }
 
-        private void check_send_type_Checked(object sender, RoutedEventArgs e)
+        private void check_send_type_Checked(object? sender, RoutedEventArgs e)
         {
             bool? is_checked = false;
             is_checked = ((CheckBox)sender).IsChecked; // 获取当前状态
@@ -566,7 +536,7 @@ namespace Cosmos.App.Hithink.ComDemo
             {
                 _send_type = "group";
             }
-            
+
         }
 
         private Thread timerThread;
@@ -577,7 +547,7 @@ namespace Cosmos.App.Hithink.ComDemo
 
         [DllImport("winmm.dll")]
         static extern uint timeEndPeriod(uint period);
-        private void check_timer_Checked(object sender, RoutedEventArgs e)
+        private void check_timer_Checked(object? sender, RoutedEventArgs e)
         {
             ReceiveTxt("");
 
@@ -591,8 +561,6 @@ namespace Cosmos.App.Hithink.ComDemo
             is_checked = ((CheckBox)sender).IsChecked; // 获取当前状态
             if (is_checked == true)
             {
-                //_timer.Change(interval, interval);
-                
                 isRunning = true;
                 timerThread = new Thread(() =>
                 {
@@ -601,7 +569,7 @@ namespace Cosmos.App.Hithink.ComDemo
                         {
                             TimerCallback(null);
                             total--;
-                            if(total == 0)
+                            if (total == 0)
                             {
                                 ReceiveTxt("本次发送完成");
                                 break;
@@ -629,10 +597,10 @@ namespace Cosmos.App.Hithink.ComDemo
 
         public IList<TradeDataAccessor> _tradeList;
         public IDictionary<TradeDataAccessor, ITradeDataSubscription> _SubList;
-        private async void btn_create_Click(object sender, RoutedEventArgs e)
+        private async void btn_create_Click(object? sender, RoutedEventArgs e)
         {
-            int linkCount = int.Parse(text_Link.Text);
-            int account = int.Parse(text_Name.Text);
+            int linkCount = int.Parse(text_Link.Text ?? "0");
+            int account = int.Parse(text_Name.Text ?? "0");
             var baseInfo = await _tradeDataAccessor.DataProvider.GetBaseInfo();
             for (int i = 0; i < linkCount; i++)
             {
@@ -651,9 +619,9 @@ namespace Cosmos.App.Hithink.ComDemo
             }
         }
 
-        private Timer _reqTimer;
+        private System.Threading.Timer _reqTimer;
 
-        private async void ReqTimerCallback(object state)
+        private async void ReqTimerCallback(object? state)
         {
             try
             {
@@ -675,11 +643,6 @@ namespace Cosmos.App.Hithink.ComDemo
                 context["name"] = "123123";
                 requestParameters.Parameters = JsonSerializer.Serialize(context, options);
 
-                //同步等待应答
-                /*{
-                    var result = await _tradeDataAccessor.DataProvider.ThirdModuleRequest(requestParameters);
-                    _logger?.Log(CosmosLogLevel.Information, $"reqresult:{result.data} id : {result.uuid} code:{result.code}  msg:{result.msg} ");
-                }*/
                 foreach (var tradeAccessor in _tradeList)
                 {
                     requestParameters.uuid = Guid.NewGuid().ToString();
@@ -696,7 +659,7 @@ namespace Cosmos.App.Hithink.ComDemo
             }
         }
 
-        private async void btn_req_Click(object sender, RoutedEventArgs e)
+        private async void btn_req_Click(object? sender, RoutedEventArgs e)
         {
             // 创建定时器（初始延迟1秒，间隔3000毫秒）
             _reqTimer = new System.Threading.Timer(
@@ -705,10 +668,10 @@ namespace Cosmos.App.Hithink.ComDemo
                dueTime: TimeSpan.FromMilliseconds(1000),
                period: TimeSpan.FromMilliseconds(3000)
            );
-           
+
         }
 
-        private async void btn_sub_Click(object sender, RoutedEventArgs e)
+        private async void btn_sub_Click(object? sender, RoutedEventArgs e)
         {
 
             /// 调用第三方订阅接口
@@ -728,20 +691,20 @@ namespace Cosmos.App.Hithink.ComDemo
 
                 if (subscribetion.code != 0)
                 {
-                    WpfToast.Show($"订阅失败 msg:{subscribetion.msg}", CosmosLogLevel.Error);
+                    AvaloniaToast.Show($"订阅失败 msg:{subscribetion.msg}", CosmosLogLevel.Error);
                     _logger?.Log(CosmosLogLevel.Error, $"订阅失败 msg:{subscribetion.msg}");
                 }
                 else
                 {
                     _SubList[tradeAccessor] = subscribetion;
-                    WpfToast.Show("订阅higate成功");
+                    AvaloniaToast.Show("订阅higate成功");
                     _logger?.Log(CosmosLogLevel.Information, "订阅higate成功");
                 }
             }
 
         }
 
-        private async void btn_ubsub_Click(object sender, RoutedEventArgs e)
+        private async void btn_ubsub_Click(object? sender, RoutedEventArgs e)
         {
             /// 调用第三方取消订阅接口
             IUnSubscribeParameters unsubscribeParameters = _tradeDataAccessor.DataProvider.CreateUnSubscribeParameters();
@@ -755,12 +718,12 @@ namespace Cosmos.App.Hithink.ComDemo
                 var result = await sub.Key.DataProvider.UnSubscribThirdModule(unsubscribeParameters, sub.Value);
                 if (result.code == 0)
                 {
-                    WpfToast.Show("取消订阅higate成功");
+                    AvaloniaToast.Show("取消订阅higate成功");
                     _logger?.Log(CosmosLogLevel.Information, "取消订阅higate成功");
                 }
                 else
                 {
-                    WpfToast.Show($"取消订阅 msg:{result.msg}", CosmosLogLevel.Error);
+                    AvaloniaToast.Show($"取消订阅 msg:{result.msg}", CosmosLogLevel.Error);
                     _logger?.Log(CosmosLogLevel.Error, $"取消订阅 msg:{result.msg}");
                 }
             }
@@ -777,3 +740,4 @@ namespace Cosmos.App.Hithink.ComDemo
         }
     }
 }
+

@@ -1,11 +1,6 @@
-﻿using Cosmos.DataAccess.v1.Model;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Cosmos.DataAccess.v1.Model;
 
-namespace Cosmos.App.Hithink.ComDemo
+namespace Cosmos.App.Hithink.Demo.Shared
 {
     /// <summary>
     /// 资产搜索结果记录
@@ -18,3 +13,4 @@ namespace Cosmos.App.Hithink.ComDemo
         public string DisplayMarketName { get; set; }
     }
 }
+

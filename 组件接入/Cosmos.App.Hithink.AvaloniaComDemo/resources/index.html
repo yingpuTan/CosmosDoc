@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <ul>
+    </ul>
+</body>
+
+<script>
+    // 注册cefQuery函数，这一段可以直接固定引入
+    window.cefQuery = function (request, callback) {
+        // 支持 Promise 和回调两种方式
+        if (typeof callback !== 'function') {
+            return new Promise((resolve, reject) => {
+                cefQueryInternal.handleRequestAsync(request)
+                    .then(result => resolve(result))
+                    .catch(error => reject(error));
+            });
+        } else {
+            cefQueryInternal.handleRequestAsync(request)
+                .then(result => callback(null, result))
+                .catch(error => callback(error, null));
+        }
+    };
+
+    // 获取皮肤资源示例，将皮肤资源注入:root的css变量，根据需要使用，建议添加默认值
+    window.cefQuery({
+        request: JSON.stringify({ Type: 'GetThemeResources' }),
+        persistent: false,
+        onSuccess: (data) => {
+            console.log('client response', JSON.parse(data));
+            const themeData = JSON.parse(data)
+            let style = ``
+            Object.entries(themeData.Color).forEach(([key, value]) => {
+                // css的十六进制颜色表示的透明度位与其他UI框架存在差异
+                style += `--${key}: #${value.slice(3, 9)}${value.slice(1, 3)};\n`
+            })
+            Object.entries(themeData.FontFamily).forEach(([key, value]) => {
+                style += `--${key}: #${value};\n`
+            })
+            Object.entries(themeData.FontSize).forEach(([key, value]) => {
+                style += `--${key}: #${value}px;\n`
+            })
+            const styleEl = document.createElement('style')
+            styleEl.textContent = `:root { ${style} }`
+            document.head.append(styleEl)
+        },
+        onFailure: (code, error) => {
+            console.error(error)
+        },
+    });
+
+    // 效果展示示例
+    window.cefQuery({
+        request: JSON.stringify({ Type: 'GetThemeResources' }),
+        persistent: false,
+        onSuccess: (data) => {
+            console.log('client response', JSON.parse(data));
+            const themeData = JSON.parse(data)
+            let domFragement = ``
+            Object.entries(themeData.Color).forEach(([key, value]) => {
+                domFragement += `<li style="--bg-color: #${value.slice(3, 9)}${value.slice(1, 3)}">${key}</li>`
+            })
+            Object.entries(themeData.FontFamily).forEach(([key, value]) => {
+                domFragement += `<li style="--font-familay: ${value};">这是一段字体演示文字。${key}</li>`
+            })
+            Object.entries(themeData.FontSize).forEach(([key, value]) => {
+                domFragement += `<li style="--fs: ${value}px;">这是一段字体大小演示文字。${key}</li>`
+            })
+            const ul = document.querySelector('ul')
+            ul.innerHTML = domFragement;
+        },
+        onFailure: (code, error) => {
+            console.error(error)
+        },
+    });
+
+    window.GetAdd = function (x, y) {
+        console.log(x + y);
+        return x + y;
+    }
+</script>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+}
+ul, li {
+    list-style: none;
+    width: 100%;
+}
+li {
+    height: 28px;
+    background: var(--bg-color);
+    font-family: var(--font-familay);
+    font-size: var(--fs);
+    text-align: center;
+    line-height: 28px;
+	color: white;
+    border-bottom: 1px solid #333333;
+}
+</style>
+</html>
+

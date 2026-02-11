@@ -30,44 +30,10 @@ using System.Text.Json.Nodes;
 using Newtonsoft.Json.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
+using Cosmos.App.Hithink.Demo.Shared;
 
 namespace Cosmos.App.Hithink.ComDemo
 {
-    /// <summary>
-    /// 配置
-    /// </summary>
-    public class Config
-    {
-        /// <summary>
-        /// 页面地址
-        /// </summary>
-        public String Url { get; set; }
-
-        /// <summary>
-        /// 域名
-        /// </summary>
-        public String Domain { get; set; }
-    }
-
-    internal class JsRequest
-    {
-        public string Type { get; set; }
-
-        public string Param { get; set; }
-    }
-
-    internal class GetUserIdResponse
-    {
-        public string UserID { get; set; }
-    }
-
-    internal class AccountInfo
-    {
-        public string AccountName { get; set; }
-        public string Account { get; set; }
-        public string Qsid { get; set; }
-        public string State { get; set; }
-    }
 
     public class WpfComDemoGui : 
         WpfCosmosAppWidget, //组件基类，必须继承自此类，并且需要实现类中提供的抽象方法。
@@ -251,10 +217,6 @@ namespace Cosmos.App.Hithink.ComDemo
             throw new NotImplementedException();
         }
 
-        internal class SetTextRequest
-        {
-            public string Name { get; set; }
-        }
 
         /// <summary>
         /// 提供给宿主notify调用的方法（异步方法）

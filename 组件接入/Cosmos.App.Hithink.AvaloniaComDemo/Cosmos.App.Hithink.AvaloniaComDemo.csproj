@@ -1,17 +1,18 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0-windows</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<Version>0.0.64</Version>
-	<UseWPF>true</UseWPF>
-	<Description>组件demo</Description>
-	<Title>组件demo</Title>
+	<UseAvalonia>true</UseAvalonia>
+	<Description>组件demo (Avalonia版本)</Description>
+	<Title>组件demo (Avalonia版本)</Title>
 	<PackageIcon>PackageIcon.png</PackageIcon>
 	<PackageTags>69cc84f4-56d3-4ece-a229-4df73af813a8</PackageTags>
 	<PackageId>69cc84f4-56d3-4ece-a229-4df73af813a8</PackageId>
 	<Configurations>Debug;Release;Publish</Configurations>
+	<DefineConstants>AVALONIA</DefineConstants>
   </PropertyGroup>
 	<!--添加元数据文件到nupkg，组件运行时需要从该文件读取信息-->
 	<ItemGroup>
@@ -36,6 +37,7 @@
 	  <PackageReference Include="Cosmos.DataAccess.Trade.HighGate" Version="1.0.7" />
 	  <PackageReference Include="Cosmos.OsslSignCode.Native" Version="0.0.5" />
 	  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+	  <PackageReference Include="Avalonia" Version="11.0.10" />
 	</ItemGroup>
 	<ItemGroup>
 		<Content Include="resources\*.*">
@@ -47,3 +49,4 @@
 		<ProjectReference Include="..\Cosmos.App.Hithink.Demo.Shared\Cosmos.App.Hithink.Demo.Shared.shproj" />
 	</ItemGroup>
 </Project>
+
