@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
 					jsPreference.AddMember(rapidjson::StringRef("WindowVisibility"), rapidjson::StringRef("Visible"), doc.GetAllocator());
 					jsPreference.AddMember(rapidjson::StringRef("ResizeMode"), rapidjson::StringRef("CanResize"), doc.GetAllocator());
 					jsPreference.AddMember(rapidjson::StringRef("WidgetWidth"), 600, doc.GetAllocator());
-					jsPreference.AddMember(rapidjson::StringRef("WidgetHeight"), 600, doc.GetAllocator());
+					jsPreference.AddMember(rapidjson::StringRef("WidgetHeight"), 400, doc.GetAllocator());
 					jsPreference.AddMember(rapidjson::StringRef("BorderThickness"), rapidjson::StringRef("1"), doc.GetAllocator());
 					jsPreference.AddMember(rapidjson::StringRef("WindowTop"), 0, doc.GetAllocator());
 					jsPreference.AddMember(rapidjson::StringRef("WindowLeft"), 0, doc.GetAllocator());
@@ -85,7 +85,7 @@ int main(int argc, char* argv[])
 					jsParameters.AddMember(rapidjson::StringRef("WindowVisibility"), rapidjson::StringRef("Visible"), doc.GetAllocator());
 					jsParameters.AddMember(rapidjson::StringRef("ResizeMode"), rapidjson::StringRef("CanResize"), doc.GetAllocator());
 					jsParameters.AddMember(rapidjson::StringRef("WidgetWidth"), 600, doc.GetAllocator());
-					jsParameters.AddMember(rapidjson::StringRef("WidgetHeight"), 600, doc.GetAllocator());
+					jsParameters.AddMember(rapidjson::StringRef("WidgetHeight"), 400, doc.GetAllocator());
 					jsParameters.AddMember(rapidjson::StringRef("BorderThickness"), rapidjson::StringRef("1"), doc.GetAllocator());
 					jsParameters.AddMember(rapidjson::StringRef("WindowTop"), 0, doc.GetAllocator());
 					jsParameters.AddMember(rapidjson::StringRef("WindowLeft"), 0, doc.GetAllocator());

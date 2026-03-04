@@ -33,8 +33,7 @@ static std::string GetMainAppName() {
 #if defined(_WIN32)
     return "Cosmos.MainApp.exe";
 #else
-    // 非 Windows 下通常没有 .exe 后缀；如实际引擎包仍带后缀，可自行改这里或做成配置项
-    return "Cosmos.MainApp";
+    return "Cosmos.MainApp.CrossPlatform";
 #endif
 }
 
@@ -271,9 +270,12 @@ CCosmosApi::CCosmosApi()
     //cef参数参数设置，如果存在cef的组件，需要设置该配置，不然无法运行cef组件
     auto webViewParameters = new Cosmos_WebViewParameters;
     memset(webViewParameters, 0, sizeof(Cosmos_WebViewParameters));
-    webViewParameters->CefDirectory = "C:/Users/ThsQstudio";                         		   //cef动态库路径
-    webViewParameters->CefResourcesDirectory = "C:/Users/ThsQstudio/Resources";                //cef资源路径
-    webViewParameters->CefLocaleDirectory = "C:/Users/ThsQstudio/Resources/locales";           //cef字体包路径
+    std::string cefPath = platform::path_join(platform::path_join(strPath, "Cosmos"), "cef");
+    std::string cefResourcesPath = platform::path_join(cefPath, "Resources");
+    std::string cefLocalPath = platform::path_join(cefResourcesPath, "locales");
+    webViewParameters->CefDirectory = cefPath.c_str();                         		   //cef动态库路径
+    webViewParameters->CefResourcesDirectory = cefResourcesPath.c_str();                //cef资源路径
+    webViewParameters->CefLocaleDirectory = cefLocalPath.c_str();           //cef字体包路径
 
     //向cosmos引擎提供宿主回调函数
     auto responsibility = new Cosmos_Responsibility;

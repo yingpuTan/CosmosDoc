@@ -9,8 +9,8 @@
 	<Description>组件demo (Avalonia版本)</Description>
 	<Title>组件demo (Avalonia版本)</Title>
 	<PackageIcon>PackageIcon.png</PackageIcon>
-	<PackageTags>69cc84f4-56d3-4ece-a229-4df73af813a8</PackageTags>
-	<PackageId>69cc84f4-56d3-4ece-a229-4df73af813a8</PackageId>
+	<PackageTags>b8f2e9a1-3c4d-4f5e-9a6b-7c8d9e0f1a2b</PackageTags>
+	<PackageId>b8f2e9a1-3c4d-4f5e-9a6b-7c8d9e0f1a2b</PackageId>
 	<Configurations>Debug;Release;Publish</Configurations>
 	<DefineConstants>AVALONIA</DefineConstants>
   </PropertyGroup>
@@ -30,11 +30,6 @@
 		<EmbeddedResource Include="Config.json" />
 	</ItemGroup>
 	<ItemGroup>
-	  <PackageReference Include="Cosmos.App.Sdk" Version="1.0.7" />
-	  <PackageReference Include="Cosmos.App.Sdk.Windows" Version="1.0.7" />
-	  <PackageReference Include="Cosmos.DataAccess" Version="1.0.7" />
-	  <PackageReference Include="Cosmos.DataAccess.Trade" Version="1.0.7" />
-	  <PackageReference Include="Cosmos.DataAccess.Trade.HighGate" Version="1.0.7" />
 	  <PackageReference Include="Cosmos.OsslSignCode.Native" Version="0.0.5" />
 	  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 	  <PackageReference Include="Avalonia" Version="11.0.10" />
@@ -46,7 +41,12 @@
 		</Content>
 	</ItemGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\Cosmos.App.Hithink.Demo.Shared\Cosmos.App.Hithink.Demo.Shared.shproj" />
+	  <ProjectReference Include="..\Cosmos.App.Sdk.Avalonia\Cosmos.App.Sdk.Avalonia.csproj" />
+	  <ProjectReference Include="..\Cosmos.App.Sdk\Cosmos.App.Sdk.csproj" />
+	  <ProjectReference Include="..\Cosmos.DataAccess.Trade.HighGate\Cosmos.DataAccess.Trade.HighGate.csproj" />
+	  <ProjectReference Include="..\Cosmos.DataAccess.Trade\Cosmos.DataAccess.Trade.csproj" />
+	  <ProjectReference Include="..\Cosmos.DataAccess\Cosmos.DataAccess.csproj" />
 	</ItemGroup>
+	<Import Project="..\Cosmos.App.Hithink.Demo.Shared\Cosmos.App.Hithink.Demo.Shared.projitems" Label="Shared" />
 </Project>
 

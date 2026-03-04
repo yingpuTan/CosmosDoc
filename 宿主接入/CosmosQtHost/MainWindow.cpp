@@ -5,13 +5,14 @@
 #include <QPushButton>
 #include <QWidget>
 #include <QWindow>
+#include <QCloseEvent>
 #include <QDebug>
 
 #include "Cosmos.Product.Sdk.h"
 #include "platform.h"
-#include "document.h"
-#include "stringbuffer.h"
-#include "writer.h"
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 #ifdef Q_OS_WIN
 #  include <windows.h>
@@ -72,7 +73,7 @@ std::string GetMainAppName()
 #if defined(_WIN32)
     return "Cosmos.MainApp.exe";
 #else
-    return "Cosmos.MainApp";
+    return "Cosmos.MainApp.CrossPlatform";
 #endif
 }
 
@@ -194,12 +195,17 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     // 清理嵌入的窗口
+    // 注意：QWidget::createWindowContainer 创建的容器会管理 QWindow 的生命周期
+    // 删除 m_embeddedWidget 时，Qt 会自动删除它关联的 m_embeddedWindow
     if (m_embeddedWidget) {
         m_embeddedWidget->setParent(nullptr);
         delete m_embeddedWidget;
         m_embeddedWidget = nullptr;
-    }
-    if (m_embeddedWindow) {
+        // m_embeddedWindow 已被自动删除，设置为 nullptr 避免悬空指针
+        m_embeddedWindow = nullptr;
+    } else if (m_embeddedWindow) {
+        // 如果 m_embeddedWidget 不存在但 m_embeddedWindow 存在（createWindowContainer 失败的情况）
+        // 需要手动删除 m_embeddedWindow
         delete m_embeddedWindow;
         m_embeddedWindow = nullptr;
     }
@@ -229,7 +235,7 @@ void MainWindow::initCosmos()
     std::string exeDir = platform::executable_dir();
     std::string sdkPath = platform::path_join(platform::path_join(exeDir, "Cosmos"), GetSdkLibraryName());
     if (!g_sdkModule.load(sdkPath)) {
-        qDebug() << "加载 Cosmos SDK 失败:" << QString::fromStdString(g_sdkModule.last_error());
+        qDebug() << "Failed to load Cosmos SDK:" << QString::fromStdString(g_sdkModule.last_error());
         return;
     }
 
@@ -240,7 +246,7 @@ void MainWindow::initCosmos()
     g_releaseInvoke = reinterpret_cast<Cosmos_ReleaseInvokeResponseDelegate>(g_sdkModule.symbol("Cosmos_ReleaseInvokeResponse"));
 
     if (!g_initEnv || !g_uninitEnv || !g_invoke || !g_releaseInvoke) {
-        qDebug() << "获取 Cosmos C API 函数指针失败";
+        qDebug() << "Failed to get Cosmos C API function pointers";
         return;
     }
 
@@ -256,12 +262,12 @@ void MainWindow::initCosmos()
     std::string dataProduct, dataMarketAccount;
     {
         docProduct.SetObject();
-        docProduct.AddMember(rapidjson::StringRef("Account"), "test", docProduct.GetAllocator());
-        docProduct.AddMember(rapidjson::StringRef("Token"), "123", docProduct.GetAllocator());
+        docProduct.AddMember(rapidjson::StringRef("Account"), "22282", docProduct.GetAllocator());
+        docProduct.AddMember(rapidjson::StringRef("Token"), "", docProduct.GetAllocator());
         docProduct.AddMember(rapidjson::StringRef("Password"), "123123", docProduct.GetAllocator());
-        docProduct.AddMember(rapidjson::StringRef("ProductID"), "test", docProduct.GetAllocator());
+        docProduct.AddMember(rapidjson::StringRef("ProductID"), "GMatrix", docProduct.GetAllocator());
         docProduct.AddMember(rapidjson::StringRef("SpiderUrl"), "https://unitetest.chinastock.com.cn:8081", docProduct.GetAllocator());
-        docProduct.AddMember(rapidjson::StringRef("Ip"), "10.4.124.34", docProduct.GetAllocator());
+        docProduct.AddMember(rapidjson::StringRef("Ip"), "unitetest.chinastock.com.cn", docProduct.GetAllocator());
         docProduct.AddMember(rapidjson::StringRef("Port"), 9999, docProduct.GetAllocator());
 
         rapidjson::StringBuffer buf;
@@ -282,7 +288,9 @@ void MainWindow::initCosmos()
         dataMarketAccount = base64_encode(dataMarketAccount);
     }
 
-    static std::string idStr = std::string("HostDemo-```") + dataMarketAccount + "```" + dataProduct + "```";
+    // 使用字符数组避免反引号在字符串字面量中的潜在问题
+    static const char separator[] = "```";
+    static std::string idStr = std::string("HostDemo-") + separator + dataMarketAccount + separator + dataProduct + separator;
     clientParameters->Id = idStr.c_str();
     clientParameters->Version = "0.0.0.1";
     clientParameters->HighDpiMode = Comos_GuiHighDpiMode::SystemAware;
@@ -290,14 +298,18 @@ void MainWindow::initCosmos()
     Cosmos_DeveloperParameter* developerParameters = new Cosmos_DeveloperParameter;
     memset(developerParameters, 0, sizeof(Cosmos_DeveloperParameter));
     developerParameters->AppProviderMode = "nuget;https://unitetest.chinastock.com.cn:453/v3/index.json";
+    //developerParameters->AppProviderMode = "local";
     developerParameters->RuntimeMode = "debug";
     developerParameters->GuiMode = "show";
 
     Cosmos_WebViewParameters* webViewParameters = new Cosmos_WebViewParameters;
     memset(webViewParameters, 0, sizeof(Cosmos_WebViewParameters));
-    webViewParameters->CefDirectory = "C:/Users/ThsQstudio";
-    webViewParameters->CefResourcesDirectory = "C:/Users/ThsQstudio/Resources";
-    webViewParameters->CefLocaleDirectory = "C:/Users/ThsQstudio/Resources/locales";
+    std::string cefPath = platform::path_join(platform::path_join(exeDir, "Cosmos"), "cef");
+    std::string cefResourcesPath = platform::path_join(cefPath, "Resources");
+    std::string cefLocalPath = platform::path_join(cefResourcesPath, "locales");
+    webViewParameters->CefDirectory = cefPath.c_str();
+    webViewParameters->CefResourcesDirectory = cefResourcesPath.c_str();
+    webViewParameters->CefLocaleDirectory = cefLocalPath.c_str();
 
     Cosmos_Responsibility* resp = new Cosmos_Responsibility;
     memset(resp, 0, sizeof(Cosmos_Responsibility));
@@ -320,26 +332,179 @@ void MainWindow::initCosmos()
     Cosmos_Result* r = g_initEnv(nullptr, g_envParams, nullptr);
     if (!r || r->Code != 200) {
         int code = r ? static_cast<int>(r->Code) : -1;
-        qDebug() << "Cosmos 初始化失败，code =" << code;
+        qDebug() << "Cosmos initialization failed, code =" << code;
     } else {
-        qDebug() << "Cosmos 初始化成功";
+        qDebug() << "Cosmos initialization succeeded";
     }
     if (r) {
         // 初始化结果由 SDK 分配，不在此释放；保持与示例一致
     }
 }
 
+void MainWindow::destroyWidget()
+{
+    // 如果已有组件，先关闭它
+    if (m_widgetHandle.empty() && m_windowHandle.empty()) {
+        return;  // 没有已创建的组件，直接返回
+    }
+
+    if (!g_invoke) {
+        qDebug() << "Cosmos SDK not initialized, cannot destroy widget";
+        return;
+    }
+
+    // 构造 DestroyWidget 调用请求
+    rapidjson::Document doc;
+    doc.SetObject();
+    rapidjson::Value jsParameters(rapidjson::kObjectType), jsActionContext(rapidjson::kObjectType);
+
+    jsParameters.AddMember(rapidjson::StringRef("WidgetHandle"),
+                          rapidjson::Value(m_widgetHandle.c_str(), doc.GetAllocator()),
+                          doc.GetAllocator());
+    jsParameters.AddMember(rapidjson::StringRef("WindowHandle"),
+                          rapidjson::Value(m_windowHandle.c_str(), doc.GetAllocator()),
+                          doc.GetAllocator());
+
+    jsActionContext.AddMember(rapidjson::StringRef("Parameters"), jsParameters, doc.GetAllocator());
+    jsActionContext.AddMember(rapidjson::StringRef("Function"),
+                             rapidjson::StringRef("DestroyWidget"), doc.GetAllocator());
+    jsActionContext.AddMember(rapidjson::StringRef("Invoker"),
+                             rapidjson::StringRef("00000000"), doc.GetAllocator());
+
+    doc.AddMember(rapidjson::StringRef("ActionContext"), jsActionContext, doc.GetAllocator());
+    doc.AddMember(rapidjson::StringRef("Action"), rapidjson::StringRef("Invoke"), doc.GetAllocator());
+    doc.AddMember(rapidjson::StringRef("ActionInstance"),
+                 rapidjson::StringRef("QtHostDemo"), doc.GetAllocator());
+
+    rapidjson::StringBuffer strBuf;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(strBuf);
+    doc.Accept(writer);
+
+    std::string payloadUtf8 = gbk_to_utf8(strBuf.GetString());
+
+    Cosmos_InvokeRequest* req = new Cosmos_InvokeRequest;
+    std::string methodUtf8 = gbk_to_utf8("DestroyWidget");
+    req->Method = methodUtf8.c_str();
+    req->Parameters = payloadUtf8.c_str();
+
+    Cosmos_InvokeResponse* resp = g_invoke(nullptr, req);
+    if (resp) {
+        int code = static_cast<int>(resp->Result->Code);
+        if (code == 200) {
+            qDebug() << "Widget destroyed successfully";
+        } else {
+            qDebug() << "DestroyWidget failed, code =" << code;
+        }
+        g_releaseInvoke(nullptr, resp);
+    } else {
+        qDebug() << "DestroyWidget call failed (null response)";
+    }
+    delete req;
+
+    // 清理本地状态
+    m_widgetHandle.clear();
+    m_windowHandle.clear();
+
+    // 清理 UI 对象（如果存在）
+    if (m_embeddedWidget) {
+        m_embeddedWidget->setParent(nullptr);
+        delete m_embeddedWidget;
+        m_embeddedWidget = nullptr;
+        m_embeddedWindow = nullptr;  // 已被自动删除
+    } else if (m_embeddedWindow) {
+        delete m_embeddedWindow;
+        m_embeddedWindow = nullptr;
+    }
+}
+
+void MainWindow::shutdownCosmos()
+{
+    // 如果已经关闭过，直接返回
+    if (m_cosmosShutdown) {
+        return;
+    }
+
+    if (!g_invoke) {
+        qDebug() << "Cosmos SDK not initialized, cannot shutdown";
+        m_cosmosShutdown = true;
+        return;
+    }
+
+    // 构造 ShutdownCosmos 调用请求
+    rapidjson::Document doc;
+    doc.SetObject();
+    rapidjson::Value jsParameters(rapidjson::kObjectType), jsActionContext(rapidjson::kObjectType);
+
+    jsActionContext.AddMember(rapidjson::StringRef("Parameters"), jsParameters, doc.GetAllocator());
+    jsActionContext.AddMember(rapidjson::StringRef("Function"),
+                             rapidjson::StringRef("ShutdownCosmos"), doc.GetAllocator());
+    jsActionContext.AddMember(rapidjson::StringRef("Invoker"),
+                             rapidjson::StringRef("00000000"), doc.GetAllocator());
+
+    doc.AddMember(rapidjson::StringRef("ActionContext"), jsActionContext, doc.GetAllocator());
+    doc.AddMember(rapidjson::StringRef("Action"), rapidjson::StringRef("Invoke"), doc.GetAllocator());
+    doc.AddMember(rapidjson::StringRef("ActionInstance"),
+                 rapidjson::StringRef("QtHostDemo"), doc.GetAllocator());
+
+    rapidjson::StringBuffer strBuf;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(strBuf);
+    doc.Accept(writer);
+
+    std::string payloadUtf8 = gbk_to_utf8(strBuf.GetString());
+
+    Cosmos_InvokeRequest* req = new Cosmos_InvokeRequest;
+    std::string methodUtf8 = gbk_to_utf8("ShutdownCosmos");
+    req->Method = methodUtf8.c_str();
+    req->Parameters = payloadUtf8.c_str();
+
+    Cosmos_InvokeResponse* resp = g_invoke(nullptr, req);
+    if (resp) {
+        int code = static_cast<int>(resp->Result->Code);
+        if (code == 200) {
+            qDebug() << "Cosmos engine shutdown successfully";
+        } else {
+            qDebug() << "ShutdownCosmos failed, code =" << code;
+        }
+        g_releaseInvoke(nullptr, resp);
+    } else {
+        qDebug() << "ShutdownCosmos call failed (null response)";
+    }
+    delete req;
+
+    m_cosmosShutdown = true;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    // 在关闭窗口前，先关闭组件和组件引擎
+    // 1. 如果有已创建的组件，先关闭它
+    if (!m_widgetHandle.empty() || !m_windowHandle.empty()) {
+        destroyWidget();
+    }
+
+    // 2. 关闭组件引擎
+    shutdownCosmos();
+
+    // 3. 允许窗口关闭
+    event->accept();
+}
+
 void MainWindow::createAndEmbedWidget()
 {
     if (!m_cosmosContainer || !g_invoke) {
-        qDebug() << "环境未初始化完成";
+        qDebug() << "Environment not initialized";
         return;
+    }
+
+    // 如果已有组件，先关闭它
+    if (!m_widgetHandle.empty() || !m_windowHandle.empty()) {
+        destroyWidget();
     }
 
     // 确保容器窗口已创建（调用 winId() 会强制创建窗口）
     WId parentWindowId = m_cosmosContainer->winId();
     if (!parentWindowId) {
-        qDebug() << "获取 Qt 容器窗口 ID 失败";
+        qDebug() << "Failed to get Qt container window ID";
         return;
     }
 
@@ -355,13 +520,16 @@ void MainWindow::createAndEmbedWidget()
     // Linux: X11 Window (unsigned long)
     QString parentStr;
 #ifdef Q_OS_WIN
-    // Windows 上 WId 就是 HWND，转换为 qint64 字符串
-    parentStr = QString::number(reinterpret_cast<qint64>(parentWindowId));
+    // Windows 上 WId 就是 HWND（指针），先转换为 void*，再转换为 quintptr，最后转换为 qint64
+    void* hwndPtr = reinterpret_cast<void*>(parentWindowId);
+    quintptr hwndValue = reinterpret_cast<quintptr>(hwndPtr);
+    parentStr = QString::number(static_cast<qint64>(hwndValue));
 #elif defined(Q_OS_LINUX)
-    // Linux 上 WId 就是 X11 Window (unsigned long)，直接转换为字符串
-    parentStr = QString::number(reinterpret_cast<unsigned long>(parentWindowId));
+    // Linux 上 WId 就是 X11 Window，先转换为 quintptr，再转换为 unsigned long
+    quintptr widValue = reinterpret_cast<quintptr>(parentWindowId);
+    parentStr = QString::number(static_cast<unsigned long>(widValue));
 #else
-    qDebug() << "当前平台不支持窗口嵌入";
+    qDebug() << "Window embedding not supported on this platform";
     return;
 #endif
 
@@ -388,10 +556,10 @@ void MainWindow::createAndEmbedWidget()
     jsParameters.AddMember(rapidjson::StringRef("WidgetPreference"),
                            jsPreference, doc.GetAllocator());
     jsParameters.AddMember(rapidjson::StringRef("WidgetGuid"),
-                           rapidjson::StringRef("b0fd068e-2021-4619-acc0-53cda8d94a37"),
+                           rapidjson::StringRef("d8d4e7ca-5b8d-4396-bb14-7591fea00040"),
                            doc.GetAllocator());
     jsParameters.AddMember(rapidjson::StringRef("AppGuid"),
-                           rapidjson::StringRef("1F74493F-E84D-4193-8FCE-F7CF4116EA63"),
+                           rapidjson::StringRef("2e05035e-9ce9-4f76-a5cb-9a8fff055361"),
                            doc.GetAllocator());
 
     jsActionContext.AddMember(rapidjson::StringRef("Parameters"),
@@ -421,22 +589,22 @@ void MainWindow::createAndEmbedWidget()
 
     Cosmos_InvokeResponse* resp = g_invoke(nullptr, req);
     if (!resp || !resp->Result) {
-        qDebug() << "CreateWidget 调用失败（返回空）";
+        qDebug() << "CreateWidget call failed (null response)";
         delete req;
         return;
     }
 
     int code = static_cast<int>(resp->Result->Code);
     std::string dataStr;
-    if (resp->DataFrame && resp->DataFrame->Data && resp->DataFrame->DataSize > 0) {
-        dataStr.assign(resp->DataFrame->Data, resp->DataFrame->DataSize);
+    if (resp->DataFrame && resp->DataFrame->Data) {
+        dataStr = resp->DataFrame->Data;
     }
 
     g_releaseInvoke(nullptr, resp);
     delete req;
 
     if (code != 200) {
-        qDebug() << "CreateWidget 失败, code =" << code;
+        qDebug() << "CreateWidget failed, code =" << code;
         return;
     }
 
@@ -444,36 +612,14 @@ void MainWindow::createAndEmbedWidget()
     rapidjson::Document docResult;
     docResult.Parse(dataStr.c_str());
     if (docResult.HasParseError()) {
-        qDebug() << "CreateWidget 结果解析失败，错误位置:" << docResult.GetErrorOffset();
-        return;
-    }
-
-    // 检查响应状态码
-    if (!docResult.HasMember("Code") || docResult["Code"].GetInt64() != 200) {
-        int64_t errorCode = docResult.HasMember("Code") ? docResult["Code"].GetInt64() : -1;
-        qDebug() << "CreateWidget 返回错误码:" << errorCode;
-        return;
-    }
-
-    if (!docResult.HasMember("Data") || !docResult["Data"].IsString()) {
-        qDebug() << "CreateWidget 返回数据中没有 Data 字段或 Data 不是字符串";
-        return;
-    }
-
-    // Data 字段是 JSON 字符串，需要再次解析
-    std::string dataContent = docResult["Data"].GetString();
-    rapidjson::Document docData;
-    docData.Parse(dataContent.c_str());
-    if (docData.HasParseError()) {
-        qDebug() << "CreateWidget Data 字段解析失败，错误位置:" << docData.GetErrorOffset();
-        qDebug() << "Data 内容:" << QString::fromStdString(dataContent);
+        qDebug() << "CreateWidget result parse failed, error offset:" << docResult.GetErrorOffset();
         return;
     }
 
     // 提取 WidgetHandle 和 WindowHandle
-    if (docData.HasMember("ActionContext") && 
-        docData["ActionContext"].HasMember("Return")) {
-        const auto& returnObj = docData["ActionContext"]["Return"];
+    if (docResult.HasMember("ActionContext") && 
+        docResult["ActionContext"].HasMember("Return")) {
+        const auto& returnObj = docResult["ActionContext"]["Return"];
         
         if (returnObj.HasMember("WidgetHandle") && returnObj["WidgetHandle"].IsString()) {
             m_widgetHandle = returnObj["WidgetHandle"].GetString();
@@ -489,22 +635,34 @@ void MainWindow::createAndEmbedWidget()
             WId childWindowId = 0;
             
 #ifdef Q_OS_WIN
-            // Windows: 窗口句柄是 HWND (指针)，转换为 qint64
-            qint64 hwndValue = QString::fromStdString(m_windowHandle).toLongLong(&ok, 10);
+            // Windows: 窗口句柄是 HWND (指针)，WId 在 Windows 上就是 HWND
+            // 先将字符串转换为 quintptr（指针大小的整数），再转换为指针
+            quintptr hwndValue = QString::fromStdString(m_windowHandle).toULongLong(&ok, 10);
             if (ok && hwndValue != 0) {
-                childWindowId = reinterpret_cast<WId>(reinterpret_cast<void*>(static_cast<quintptr>(hwndValue)));
+                // 在 Windows 上，WId 就是 HWND（void*），先转换为 void*，再转换为 WId
+                void* hwndPtr = reinterpret_cast<void*>(hwndValue);
+                childWindowId = reinterpret_cast<WId>(hwndPtr);
             }
 #elif defined(Q_OS_LINUX)
-            // Linux: X11 Window ID 是 unsigned long
+            // Linux: X11 Window ID 是 unsigned long，先转换为 quintptr，再转换为 WId
             unsigned long x11WindowId = QString::fromStdString(m_windowHandle).toULong(&ok, 10);
             if (ok && x11WindowId != 0) {
-                childWindowId = reinterpret_cast<WId>(x11WindowId);
+                quintptr widValue = static_cast<quintptr>(x11WindowId);
+                childWindowId = reinterpret_cast<WId>(widValue);
             }
 #endif
             
             if (ok && childWindowId != 0) {
                 // 使用 QWindow::fromWinId 创建 QWindow
-                if (m_embeddedWindow) {
+                // 先清理旧的窗口（如果存在）
+                if (m_embeddedWidget) {
+                    // 删除 m_embeddedWidget 会自动删除它关联的 m_embeddedWindow
+                    m_embeddedWidget->setParent(nullptr);
+                    delete m_embeddedWidget;
+                    m_embeddedWidget = nullptr;
+                    m_embeddedWindow = nullptr;  // 已被自动删除，设置为 nullptr
+                } else if (m_embeddedWindow) {
+                    // 如果 m_embeddedWidget 不存在但 m_embeddedWindow 存在（createWindowContainer 失败的情况）
                     delete m_embeddedWindow;
                     m_embeddedWindow = nullptr;
                 }
@@ -512,11 +670,6 @@ void MainWindow::createAndEmbedWidget()
                 m_embeddedWindow = QWindow::fromWinId(childWindowId);
                 if (m_embeddedWindow) {
                     // 使用 createWindowContainer 将窗口嵌入到容器中
-                    if (m_embeddedWidget) {
-                        // 如果已经存在嵌入的窗口，先移除旧的
-                        m_embeddedWidget->setParent(nullptr);
-                        delete m_embeddedWidget;
-                    }
                     
                     m_embeddedWidget = QWidget::createWindowContainer(m_embeddedWindow, m_cosmosContainer);
                     if (m_embeddedWidget) {
@@ -536,25 +689,25 @@ void MainWindow::createAndEmbedWidget()
                         m_embeddedWidget->show();
                         m_embeddedWidget->setFocus();
                         
-                        qDebug() << "成功将 Cosmos 窗口嵌入到 Qt 容器中，窗口 ID:" << QString::fromStdString(m_windowHandle);
+                        qDebug() << "Successfully embedded Cosmos window into Qt container, window ID:" << QString::fromStdString(m_windowHandle);
                     } else {
-                        qDebug() << "createWindowContainer 失败";
+                        qDebug() << "createWindowContainer failed";
                         delete m_embeddedWindow;
                         m_embeddedWindow = nullptr;
                     }
                 } else {
-                    qDebug() << "QWindow::fromWinId 失败，窗口 ID:" << QString::fromStdString(m_windowHandle);
+                    qDebug() << "QWindow::fromWinId failed, window ID:" << QString::fromStdString(m_windowHandle);
                 }
             } else {
-                qDebug() << "窗口句柄转换失败:" << QString::fromStdString(m_windowHandle);
+                qDebug() << "Window handle conversion failed:" << QString::fromStdString(m_windowHandle);
             }
         } else {
-            qDebug() << "返回数据中没有 WindowHandle 字段";
+            qDebug() << "Response data missing WindowHandle field";
         }
     } else {
-        qDebug() << "返回数据格式不正确，缺少 ActionContext.Return";
+        qDebug() << "Response data format incorrect, missing ActionContext.Return";
     }
 
-    qDebug() << "CreateWidget 成功，组件应已嵌入 Qt 容器";
+    qDebug() << "CreateWidget succeeded, component should be embedded in Qt container";
 }
 

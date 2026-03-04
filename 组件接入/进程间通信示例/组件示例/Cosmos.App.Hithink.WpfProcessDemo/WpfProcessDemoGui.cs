@@ -1,5 +1,4 @@
-﻿#if WPF
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows;
 using System.Windows.Shapes;
@@ -25,6 +24,11 @@ namespace Cosmos.App.Hithink.WpfProcessDemo
         WpfCosmosAppProcessWidget //进程间通讯基类，并且需要实现类中提供的抽象方法
     {
         private ProcessDemoGuiBase _baseImpl;
+
+        /// <summary>
+        /// 日志记录
+        /// </summary>
+        protected ICosmosAppLogger _logger { get; set; }
 
         public WpfProcessDemoGui()
         {
@@ -68,8 +72,12 @@ namespace Cosmos.App.Hithink.WpfProcessDemo
         {
             _logger?.Log(CosmosLogLevel.Information, "Wfh_Loaded");
 
+            // 获取进程所在路径
+            var clientDir = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location))), @"content\dependents\TestWpf.exe");
+            //var clientDir = @"D:\git\itrader\Cosmos_yinhe\Source\RpcClient\TestWpf\bin\Debug\net7.0-windows\win-x64\TestWpf.exe";
+
             //窗口创建成功、可以启动进程通信服务
-            _baseImpl.StartRpcServer();
+            _baseImpl.StartRpcServer(clientDir);
         }
 
         private void _wfh_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -128,6 +136,9 @@ namespace Cosmos.App.Hithink.WpfProcessDemo
         /// <returns></returns>
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
+            //绑定cosmos引擎提供的日志记录器
+            _logger = ContextInjection.ThisAppContext.AppLogger;
+            _logger?.Log(CosmosLogLevel.Information, "ComDemoGui 启动");
             await _baseImpl.StartAsync(cancellationToken);
         }
 
@@ -243,4 +254,3 @@ namespace Cosmos.App.Hithink.WpfProcessDemo
         #endregion
     }
 }
-#endif

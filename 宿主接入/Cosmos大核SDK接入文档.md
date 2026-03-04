@@ -1,17 +1,17 @@
 # ‌**Cosmos大核SDK接入文档（宿主程序）**‌
 
-## ‌**1. 文档概述**‌
+## ‌1. 文档概述‌
 
 本文档提供Cosmos大核SDK的接入指南，帮助开发者快速集成SDK，实现与Cosmos系统的通信和功能调用。
 
-## ‌**2. 环境要求**‌
+## ‌2. 环境要求‌
 
-### ‌**2.1 支持平台**‌
+### ‌2.1 支持平台‌
 
 - ‌**Windows**‌ (`_WIN32`, `_WINDLL`)
 - ‌**Linux**‌ (`__linux__`, `__GNUC__ >= 4`)
 
-### ‌**2.2 跨平台支持**‌
+### ‌2.2 跨平台支持‌
 
 CosmosHost提供了完整的跨平台支持，包括：
 - 动态库加载封装（Windows: `LoadLibraryExA` / Linux: `dlopen`）
@@ -20,14 +20,14 @@ CosmosHost提供了完整的跨平台支持，包括：
 - 跨平台定时器实现（使用 `platform::PeriodicTimer`）
 - 可执行文件路径获取（使用 `platform::executable_dir`）
 
-### ‌**2.3 依赖项**‌
+### ‌2.3 依赖项‌
 
 - C/C++编译器（MSVC/GCC/Clang）
 - CMake（推荐）
 
-## ‌**3. SDK集成**‌
+## ‌3. SDK集成‌
 
-### ‌**3.1 下载SDK**‌
+### ‌3.1 下载SDK‌
 
 sdk主要包含以下文件：
 
@@ -35,11 +35,10 @@ sdk主要包含以下文件：
 - `CosmosSDK.dll`（Windows动态库）
 - `libCosmosSDK.so`（Linux动态库）
 - `osslsigncode.dll`（`CosmosSDK.dll`依赖库，仅Windows）
-- 
 
-### ‌**3.2 配置项目**‌
+### ‌3.2 配置项目‌
 
-#### ‌**CMake配置示例**‌（按照提供的demo配置）
+#### ‌CMake配置示例‌（按照提供的demo配置）
 
 ```cmake
 cmake_minimum_required(VERSION 3.10)
@@ -83,9 +82,9 @@ else()
 endif()
 ```
 
-## ‌**4. 核心API使用**‌
+## ‌4. 核心API使用‌
 
-### ‌**4.1 初始化环境**‌
+### ‌4.1 初始化环境‌
 
 ```c++
 #include "platform.h"  // 跨平台支持头文件
@@ -104,7 +103,7 @@ static std::string GetMainAppName() {
 #if defined(_WIN32)
     return "Cosmos.MainApp.exe";
 #else
-    return "Cosmos.MainApp";
+    return "Cosmos.MainApp.CrossPlatform";
 #endif
 }
 
@@ -195,9 +194,12 @@ CCosmosApi::CCosmosApi()
     //cef参数参数设置，如果存在cef的组件，需要设置该配置，不然无法运行cef组件
     auto webViewParameters = new Cosmos_WebViewParameters;
     memset(webViewParameters, 0, sizeof(Cosmos_WebViewParameters));
-    webViewParameters->CefDirectory = "C:/Users/ThsQstudio";                         		   //cef动态库路径
-    webViewParameters->CefResourcesDirectory = "C:/Users/ThsQstudio/Resources";                //cef资源路径
-    webViewParameters->CefLocaleDirectory = "C:/Users/ThsQstudio/Resources/locales";           //cef字体包路径
+    std::string cefPath = platform::path_join(platform::path_join(strPath, "Cosmos"), "cef");
+    std::string cefResourcesPath = platform::path_join(cefPath, "Resources");
+    std::string cefLocalPath = platform::path_join(cefResourcesPath, "locales");
+    webViewParameters->CefDirectory = cefPath.c_str();                         		   //cef动态库路径
+    webViewParameters->CefResourcesDirectory = cefResourcesPath.c_str();                //cef资源路径
+    webViewParameters->CefLocaleDirectory = cefLocalPath.c_str();           //cef字体包路径
 
     //向cosmos引擎提供宿主回调函数
     auto responsibility = new Cosmos_Responsibility;
@@ -235,7 +237,7 @@ CCosmosApi::CCosmosApi()
 }
 ```
 
-### **4.3 发送请求**‌
+### 4.3 发送请求‌
 
 ```c++
 std::string CCosmosApi::Invoke(const std::string& strMethod, const std::string& strRequest)
@@ -295,7 +297,7 @@ void CCosmosApi::Notify(const std::string& strTopic, const std::string& strNotif
 
 
 
-### **4.4 订阅数据**‌
+### 4.4 订阅数据‌
 
 ```c++
 //该方法组件引擎暂未实现
@@ -323,7 +325,7 @@ std::string CCosmosApi::SubScribe(const std::string& strTopic, const std::string
 }
 ```
 
-### ‌**4.5 清理资源**‌
+### ‌4.5 清理资源‌
 
 ```c++
 // 在析构函数中自动清理资源
@@ -940,7 +942,155 @@ ShortCut:{      快捷键按键映射结构体
 
 ## 6. 示例‌
 
+本文档提供了两个示例项目，帮助开发者快速理解和使用 Cosmos SDK：
+
+### 6.1 C++ 控制台示例（CosmosHost）
+
 参考：[宿主demo](./CosmosHost)
+
+这是一个基于 C++ 控制台的示例，展示了：
+- SDK 的基本初始化和配置
+- 组件的创建、调用和销毁
+- 订阅和通知机制
+- 跨平台支持（Windows/Linux）
+
+**适用场景**：
+- 学习 SDK 基本用法
+- 无 GUI 需求的宿主程序
+- 服务端或后台程序集成
+
+### 6.2 Qt GUI 示例（CosmosQtHost）
+
+参考：[Qt 宿主demo](./CosmosQtHost)
+
+这是一个基于 Qt5 的图形界面示例，展示了：
+- 在 Qt 应用中集成 Cosmos SDK
+- 使用 `QWidget::createWindowContainer` 嵌入 Cosmos 组件窗口
+- Qt 窗口生命周期管理（创建、嵌入、销毁）
+- 跨平台窗口句柄处理（Windows HWND / Linux X11 Window）
+
+#### 6.2.1 环境要求
+
+- Qt5（Widgets、Core、Gui 模块）
+- CMake 3.10 或更高版本
+- C++11 或更高版本
+
+#### 6.2.2 配置 Qt 路径
+
+在编译前需要配置 Qt5 路径，有以下三种方式：
+
+**方式 1：使用环境变量**
+```bash
+# Windows
+set QT_DIR=C:/Qt/5.15.2/msvc2019_64
+
+# Linux
+export QT_DIR=/usr/lib/qt5
+```
+
+**方式 2：使用 CMake 参数**
+```bash
+cmake -DCMAKE_PREFIX_PATH="C:/Qt/5.15.2/msvc2019_64" ..
+```
+
+**方式 3：自动查找**
+CMakeLists.txt 会自动尝试查找常见路径，如果找到会自动配置。
+
+#### 6.2.3 关键实现要点
+
+**1. 窗口句柄转换**
+
+在 Qt 中嵌入 Cosmos 组件时，需要将 Qt 的窗口 ID（`WId`）转换为字符串传递给 SDK：
+
+```cpp
+// Windows: WId 就是 HWND（指针）
+#ifdef Q_OS_WIN
+    void* hwndPtr = reinterpret_cast<void*>(parentWindowId);
+    quintptr hwndValue = reinterpret_cast<quintptr>(hwndPtr);
+    parentStr = QString::number(static_cast<qint64>(hwndValue));
+#elif defined(Q_OS_LINUX)
+    // Linux: WId 就是 X11 Window（unsigned long）
+    quintptr widValue = reinterpret_cast<quintptr>(parentWindowId);
+    parentStr = QString::number(static_cast<unsigned long>(widValue));
+#endif
+```
+
+**2. 嵌入外部窗口**
+
+使用 `QWidget::createWindowContainer` 将 Cosmos 组件窗口嵌入到 Qt 容器中：
+
+```cpp
+// 从 Cosmos 获取窗口句柄后，创建 QWindow
+m_embeddedWindow = QWindow::fromWinId(childWindowId);
+
+// 使用 createWindowContainer 嵌入到容器中
+m_embeddedWidget = QWidget::createWindowContainer(m_embeddedWindow, m_cosmosContainer);
+m_embeddedWidget->show();
+```
+
+**3. 生命周期管理**
+
+在窗口关闭时，需要按顺序清理资源：
+
+```cpp
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    // 1. 关闭已创建的组件
+    if (!m_widgetHandle.empty() || !m_windowHandle.empty()) {
+        destroyWidget();
+    }
+    
+    // 2. 关闭组件引擎
+    shutdownCosmos();
+    
+    // 3. 允许窗口关闭
+    event->accept();
+}
+```
+
+**4. 跨平台配置**
+
+Qt demo 中的关键配置与 C++ 控制台示例保持一致：
+- Linux 程序名称：`Cosmos.MainApp.CrossPlatform`
+- CEF 路径：使用 `platform::path_join` 动态构建
+- 组件参数：宽度 600，高度 400
+
+#### 6.2.4 项目结构
+
+```
+CosmosQtHost/
+├── CMakeLists.txt          # CMake 配置文件
+├── main.cpp                # 程序入口
+├── MainWindow.h            # 主窗口头文件
+├── MainWindow.cpp          # 主窗口实现
+└── include/                # 本地头文件目录
+    ├── Cosmos.Product.Sdk.h
+    └── rapidjson/         # RapidJSON 头文件
+```
+
+#### 6.2.5 编译和运行
+
+```bash
+# 创建构建目录
+mkdir build
+cd build
+
+# 配置（确保已设置 Qt 路径）
+cmake ..
+
+# 编译
+cmake --build .
+
+# 运行
+./CosmosQtHost  # Linux
+# 或
+CosmosQtHost.exe  # Windows
+```
+
+**适用场景**：
+- 基于 Qt 的桌面应用集成
+- 需要在 GUI 中嵌入 Cosmos 组件
+- 跨平台桌面应用开发
 
 ## 7. 错误处理
 
@@ -959,3 +1109,4 @@ ShortCut:{      快捷键按键映射结构体
 4. **编码转换**：cosmos内部接受和发送出来的数据都为utf8编码。需要使用`platform::gbk_to_utf8`和`platform::utf8_to_gbk`进行编码转换（Windows平台会自动转换，Linux平台直接透传）。
 5. **跨平台路径**：使用`platform::path_join`进行路径拼接，避免硬编码路径分隔符。
 6. **定时器**：使用`platform::PeriodicTimer`实现跨平台定时器，避免使用平台特定的定时器API。
+7. **引擎程序执行权限**：启动 Cosmos 引擎程序前，需确保引擎可执行文件具备执行权限。在 Linux 下若引擎无法启动，可对引擎程序（如 `Cosmos.MainApp.CrossPlatform`）执行 `chmod +x <引擎程序路径>` 赋予执行权限。

@@ -28,10 +28,10 @@
         <Label Content="测试与宿主通信：" HorizontalAlignment="Left" Margin="16,15,0,0" VerticalAlignment="Top" Width="110" Grid.Row="4"/>
         <TextBox x:Name="text_name" HorizontalAlignment="Left" Margin="128,19,0,0" VerticalAlignment="Top" Width="120" Grid.Row="4"/>
         <Button x:Name="btn_send_msg" Content="主动发送数据给宿主" HorizontalAlignment="Left" Margin="272,17,0,0" VerticalAlignment="Top" Click="btn_send_msg_Click" Grid.Row="4"/>
-        <Label Width="Auto" x:Name="lab_higate" Content="" Grid.Row="4"/>
+        <Label x:Name="lab_higate" Content="" Grid.Row="4" HorizontalAlignment="Left" Margin="400,19,0,0"/>
 
         <Label Content="测试cef组件：" HorizontalAlignment="Left" Margin="23,0,0,0" VerticalAlignment="Center" Width="110" Grid.Row="5"/>
-        <local:CosmosWebDemo x:Name="web_demo" Grid.Row="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Height="Auto"/>
+        <local:CosmosWebDemo x:Name="web_demo" Grid.Row="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
 
         <Grid Grid.Row="7" Margin="23,10,0,0">
             <TextBlock Text="开始用户名：" Width="60" HorizontalAlignment="Left"/>
@@ -52,7 +52,7 @@
 
             <TextBlock Text="发送组：" Width="60" Margin="190,0,0,0" HorizontalAlignment="Left"/>
             <TextBox x:Name="text_sender" Width="110" Margin="260,0,0,0" HorizontalAlignment="Left"/>
-            <ComboBox x:Name="comuType" HorizontalAlignment="Left" Margin="377,1,0,0" Width="120" SelectedIndex="0" SelectionChanged="comuType_SelectionChanged">
+            <ComboBox x:Name="comuType" HorizontalAlignment="Left" Margin="377,1,0,0" Width="120" SelectionChanged="comuType_SelectionChanged">
                 <ComboBoxItem Content="请求" />
                 <ComboBoxItem Content="通知"/>
             </ComboBox>

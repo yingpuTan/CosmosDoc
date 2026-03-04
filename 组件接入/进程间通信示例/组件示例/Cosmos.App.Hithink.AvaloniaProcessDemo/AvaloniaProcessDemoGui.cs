@@ -9,12 +9,21 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform;
+using Avalonia.Logging;
+using Avalonia.VisualTree;
+using System.Reflection;
 
 namespace Cosmos.App.Hithink.AvaloniaProcessDemo
 {
     public class AvaloniaProcessDemoGui :
-        WpfCosmosAppProcessWidget //进程间通讯基类，假设Avalonia也使用相同的基类或需要适配
+        AvaloniaCosmosAppProcessWidget //进程间通讯基类，假设Avalonia也使用相同的基类或需要适配
     {
+
+        /// <summary>
+        /// 日志记录
+        /// </summary>
+        protected ICosmosAppLogger _logger { get; set; }
+
         private ProcessDemoGuiBase _baseImpl;
         private NativeControlHost _nativeHost;
         private double _dpiRatioFirst = 1;
@@ -86,8 +95,13 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
         {
             _logger?.Log(CosmosLogLevel.Information, "NativeHost_AttachedToVisualTree");
 
+            // 获取进程所在路径
+            var clientDir = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location))), @"content/dependents/TestAvalonia");
+            //var clientDir = @"D:\git\itrader\Cosmos_yinhe\Source\RpcClient\TestAvalonia\bin\Debug\net7.0\TestAvalonia.exe";
+
+
             //窗口创建成功、可以启动进程通信服务
-            _baseImpl.StartRpcServer();
+            _baseImpl.StartRpcServer(clientDir);
         }
 
         private void NativeHost_SizeChanged(object? sender, SizeChangedEventArgs e)
@@ -135,6 +149,9 @@ namespace Cosmos.App.Hithink.AvaloniaProcessDemo
         /// <returns></returns>
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
+            //绑定cosmos引擎提供的日志记录器
+            _logger = ContextInjection.ThisAppContext.AppLogger;
+            _logger?.Log(CosmosLogLevel.Information, "ComDemoGui 启动");
             await _baseImpl.StartAsync(cancellationToken);
         }
 

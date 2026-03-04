@@ -10,7 +10,7 @@
 
 ### 原理
 
-​       技术架构：C++实现，导出C风格接口进行接入。以命名管道方式实现进程通信。SDK对外接口均进行异常捕捉保障稳定性。Windows平台下，所有能导入C库调用导出接口的架构终端均可接入（如主流 C/C++，C#，Python，Java，Rust，Go等，后续以C++，C#举例说明，其他在此不做介绍）
+​       技术架构：C++实现，导出C风格接口进行接入。以命名管道方式实现进程通信。SDK对外接口均进行异常捕捉保障稳定性。Windows平台下，所有能导入C库调用导出接口的架构终端均可接入（如主流 C/C++，C#，Python，Java，Rust，Go等，后续以C++，C#，Qt举例说明，其他在此不做介绍）
 
 ​       管道原理：该SDK以命名管道方式实现进程通信。SDK作为管道客户端，以服务端（Cosmos）给定的管道名称基于重叠I/O方式向服务端连接管道，以实现管道双向读写通信。
 
@@ -275,7 +275,7 @@ void* CreateRpcPush(const char* topic, const char* param);
 
 ### 服务端（Cosmos）
 
-​         以 Cosmos.App.Hithink.WpfProcessDemo 为例 （见：*/Cosmos.App.Hithink.WpfProcessDemo/WpfProcessDemoGui.cs 文件）
+​         以 Cosmos.App.Hithink.WpfProcessDemo 为例 （见：[WpfProcessDemo](./组件示例/Cosmos.App.Hithink.WpfProcessDemo/WpfProcessDemoGui.cs)）
 
 服务端注意点：
 
@@ -614,7 +614,7 @@ private void HandleSubscribe(ICosmosRpcRequest data)
 
 ### 客户端（SDK）
 
-​        分别以C#（TestWpf 项目）和C++（TestMfc 项目）举例说明。     
+​        分别以C#（TestWpf 项目）、C++（TestMfc 项目）和Qt（TestQt 项目）举例说明。     
 
 #### C#示例
 
@@ -2125,7 +2125,446 @@ void __cdecl HandleFreevoid(void* param)
 
 ~~~
 
+#### Qt示例
 
+​       文件：main.cpp, mainwindow.h, mainwindow.cpp
+
+​       流程：1）解析命令行参数（第一个参数：管道名称；第二个参数：服务端窗口信息（见： $"{hwnd}|{(int)actualWidth}|{(int)actualHeight}" ）
+
+​                  2）创建主窗口，设置管道名称和窗口信息
+
+​                  3）在窗口加载时注册回调函数，连接管道
+
+​                  4）调整窗口属性（设置父子关系，窗口风格），移动窗口位置（嵌入贴满父窗口中）
+
+​                  5）处理服务端进程发送的消息
+
+##### 1）进程入口
+
+~~~cpp
+// 文件：main.cpp
+#include <QApplication>
+#include "mainwindow.h"
+
+int main(int argc, char *argv[])
+{
+#ifdef Q_OS_WIN
+    QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+#endif
+
+    QApplication app(argc, argv);
+
+    QString pipeName;
+    QString wndInfo;
+
+    // 仅兼容旧版：args[0] = pipeName, args[1] = wndInfo（与 TestWpf 一致）
+    // Cosmos 进程侧按此顺序传参
+    if (argc > 1) {
+        pipeName = QString::fromLocal8Bit(argv[1]);
+    }
+    if (argc > 2) {
+        wndInfo = QString::fromLocal8Bit(argv[2]);
+    }
+
+    MainWindow w;
+    if (!pipeName.isEmpty())
+        w.setPipeName(pipeName);
+    if (!wndInfo.isEmpty())
+        w.setWndInfo(wndInfo);
+
+    w.show();
+    return app.exec();
+}
+~~~
+
+##### 2）SDK接口封装
+
+~~~cpp
+// 文件：mainwindow.h（RpcClient 类部分）
+class RpcClient
+{
+public:
+    bool initClient(const QString &pipeName,
+                    const QString &logPath,
+                    int logLevel)
+    {
+        const std::string pipe = pipeName.toStdString();
+        const std::string log  = logPath.toStdString();
+        bool ok = InitClient(pipe.c_str(),
+                             static_cast<int>(pipe.size()),
+                             log.c_str(),
+                             static_cast<int>(log.size()),
+                             2);  // protocol_level = 2（字符串协议）
+        m_inited = ok;
+        if (ok) { 
+            // 记录当前实例并注册 PipeClient 回调（仅需关心 Notify） 
+            s_instance = this;
+            Register(nullptr, &RpcClient::onNotifyStatic, nullptr, nullptr, nullptr); 
+        }
+        return ok;
+    }
+
+    void notify(const QJsonObject &req)
+    {
+        if (!m_inited)
+            return;
+        const std::string id     = genUuid();
+        const std::string method = req.value(QStringLiteral("method")).toString().toStdString();
+
+        Json::Value jsonParam = Json::objectValue;
+        const auto paramVal = req.value(QStringLiteral("param"));
+        if (paramVal.isObject()) {
+            jsonFromQJson(paramVal.toObject(), jsonParam);
+        }
+
+        const std::string paramStr = jsonParam.toStyledString();
+        void *rpcIn = CreateRpcRequest(id.c_str(), method.c_str(), paramStr.c_str());
+        if (!rpcIn)
+            return;
+        Notify(rpcIn);
+        FreeRpcAllocMemory(rpcIn);
+    }
+
+    void push(const QJsonObject &pushObj)
+    {
+        if (!m_inited)
+            return;
+
+        RpcPush push;
+        push.topic = pushObj.value(QStringLiteral("topic")).toString().toStdString();
+
+        const auto paramVal = pushObj.value(QStringLiteral("param"));
+        if (!paramVal.isNull()) {
+            Json::Value jsonParam;
+            jsonFromQJson(paramVal.toObject(), jsonParam);
+            push.param = jsonParam;
+        }
+
+        const std::string paramStr = push.param.toStyledString();
+        void *rpcIn = CreateRpcPush(push.topic.c_str(), paramStr.c_str());
+        if (!rpcIn)
+            return;
+        Push(rpcIn);
+        FreeRpcAllocMemory(rpcIn);
+    }
+
+    int invoke(const QJsonObject &req, QJsonObject &resp, int timeoutMs = 30000)
+    {
+        if (!m_inited)
+            return -1;
+
+        const std::string id     = genUuid();
+        const std::string method = req.value(QStringLiteral("method")).toString().toStdString();
+
+        const auto paramVal = req.value(QStringLiteral("param"));
+        Json::Value jsonParam = Json::objectValue;
+        if (!paramVal.isNull()) {
+            jsonFromQJson(paramVal.toObject(), jsonParam);
+        }
+
+        const std::string paramStr = jsonParam.toStyledString();
+        void *rpcIn = CreateRpcRequest(id.c_str(), method.c_str(), paramStr.c_str());
+        if (!rpcIn)
+            return -1;
+
+        void *outPtr = nullptr;
+        int outSize  = 0;
+        RET_CALL ret = Invoke(rpcIn, &outPtr, &outSize, timeoutMs);
+        FreeRpcAllocMemory(rpcIn);
+
+        if (ret != RET_CALL::Ok || !outPtr || outSize <= 0) {
+            if (outPtr)
+                FreeRpcAllocMemory(outPtr);
+            return -1;
+        }
+
+        std::string resultStr(static_cast<char*>(outPtr), outSize);
+        FreeRpcAllocMemory(outPtr);
+
+        // 解析 JSON 到 RpcResponse 结构再转为 QJsonObject
+        Json::CharReaderBuilder builder;
+        Json::Value root;
+        std::string errs;
+        std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+        if (!reader->parse(resultStr.c_str(),
+                           resultStr.c_str() + resultStr.size(),
+                           &root, &errs)) {
+            return -1;
+        }
+
+        RpcResponse out;
+        out.id    = root.get("id", "").asString();
+        out.code  = root.get("code", 0).asInt();
+        out.error = root["error"];
+        out.result = root["result"];
+
+        resp["id"]   = QString::fromStdString(out.id);
+        resp["code"] = out.code;
+
+        QJsonObject resultObj;
+        qjsonFromJson(out.result, resultObj);
+        resp["result"] = resultObj;
+        return out.code;
+    }
+
+    void invokeAsync(const QJsonObject &req,
+                     std::function<void(int, QJsonObject)> cb)
+    {
+        // 简单使用同步 invoke 在线程中包装成异步
+        std::thread([this, req, cb]() {
+            QJsonObject resp;
+            int ret = invoke(req, resp);
+            cb(ret, resp);
+        }).detach();
+    }
+
+    // 注册来自 PipeClient 的 Notify 回调（JSON 格式的 RpcRequest）
+    void setNotifyHandler(const std::function<void(const QJsonObject &)> &cb)
+    {
+        m_notifyHandler = cb;
+    }
+
+private:
+    // PipeClient Notify 回调（协议 level 2：直接传 JSON 文本）
+    static void CDECL_CALL onNotifyStatic(void* in, int size)
+    {
+        if (!s_instance || !in || size <= 0)
+            return;
+
+        const char *data = static_cast<const char*>(in);
+        std::string jsonStr(data, size);
+
+        Json::CharReaderBuilder builder;
+        Json::Value root;
+        std::string errs;
+        std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+        if (!reader->parse(jsonStr.c_str(),
+                           jsonStr.c_str() + jsonStr.size(),
+                           &root, &errs)) {
+            return;
+        }
+
+        QJsonObject obj;
+        qjsonFromJson(root, obj);
+
+        if (s_instance->m_notifyHandler) {
+            s_instance->m_notifyHandler(obj);
+        }
+    }
+
+    bool m_inited{false};
+    std::function<void(const QJsonObject &)> m_notifyHandler;
+    static RpcClient *s_instance;
+};
+~~~
+
+##### 3）构造初始化
+
+~~~cpp
+// 文件：mainwindow.cpp
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+{
+    buildUi();
+    connectSignals();
+
+    setWindowTitle(QStringLiteral("Cosmos RPC Qt 测试 Demo"));
+    resize(900, 500);
+
+    // 注册来自 PipeClient 的 Notify 回调（比如 setsize）
+    m_rpc.setNotifyHandler([this](const QJsonObject &msg) {
+        handleRemoteNotify(msg);
+    });
+}
+~~~
+
+##### 4）父子关系，尺寸适配
+
+~~~cpp
+// 文件：mainwindow.cpp
+void MainWindow::setupParentWindow()
+{
+#ifdef Q_OS_WIN
+    if (m_wndInfo.isEmpty())
+        return;
+
+    const QStringList parts = m_wndInfo.split(QLatin1Char('|'));
+    if (parts.size() < 3)
+        return;
+
+    bool ok = false;
+    qint64 parentHandleVal = parts[0].toLongLong(&ok);
+    if (!ok || parentHandleVal == 0)
+        return;
+
+    int w = parts[1].toInt(&ok);
+    if (!ok || w <= 0)
+        w = width();
+    int h = parts[2].toInt(&ok);
+    if (!ok || h <= 0)
+        h = height();
+
+    HWND parentHwnd = reinterpret_cast<HWND>(static_cast<intptr_t>(parentHandleVal));
+    if (!parentHwnd)
+        return;
+
+    // 强制创建本窗口的 WinId（即 HWND）
+    HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (!hwnd)
+        return;
+
+    // 先去掉标题栏和任务栏显示，只作为嵌入子窗口出现
+    setWindowFlags(Qt::FramelessWindowHint | Qt::Tool);
+
+    // 设置父窗口与大小
+    ::SetParent(hwnd, parentHwnd);
+    ::MoveWindow(hwnd, 0, 0, w, h, TRUE);
+
+    // 重新 show 一次以应用新的 flags
+    show();
+#endif
+}
+
+void MainWindow::resizeEmbeddedWindow(int w, int h)
+{
+#ifdef Q_OS_WIN
+    HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (!hwnd)
+        return;
+    ::MoveWindow(hwnd, 0, 0, w, h, TRUE);
+#endif
+}
+~~~
+
+##### 5）注册回调、连接管道
+
+~~~cpp
+// 文件：mainwindow.cpp
+void MainWindow::connectPipe()
+{
+    if (m_pipeName.isEmpty()) {
+        addStatusMessage(QStringLiteral("未提供管道名称，请通过命令行第一个参数传入管道名"));
+        return;
+    }
+
+    const QString logPath = QStringLiteral("test_rpc_qt.log");
+    if (!m_rpc.initClient(m_pipeName, logPath, 2)) {
+        addStatusMessage(QStringLiteral("连接失败！"));
+        return;
+    }
+
+    m_pipeSucc = true;
+    addStatusMessage(QStringLiteral("✓ 连接成功: ") + m_pipeName);
+
+    // 发送初始化消息
+    QJsonObject req = createRpcRequest(QStringLiteral("init_succ"));
+    m_rpc.notify(req);
+}
+~~~
+
+##### 6）消息发送及响应
+
+~~~cpp
+// 文件：mainwindow.cpp
+// 消息发送（点击界面按钮）
+void MainWindow::onNotifyClicked()
+{
+    if (!m_pipeSucc) {
+        addStatusMessage(QStringLiteral("请先建立连接"));
+        return;
+    }
+    m_rpc.notify(createRpcRequest(QStringLiteral("notf_sub")));
+    addStatusMessage(QStringLiteral("✓ Notify 发送成功"));
+}
+
+void MainWindow::onPushClicked()
+{
+    if (!m_pipeSucc) {
+        addStatusMessage(QStringLiteral("请先建立连接"));
+        return;
+    }
+
+    const QString subKey = QStringLiteral("sub_account_123456");
+    if (!s_subSet.contains(subKey)) {
+        addStatusMessage(QStringLiteral("请先订阅账户"));
+        return;
+    }
+
+    QJsonObject push;
+    push["topic"] = QStringLiteral("push_account");
+    QJsonObject param;
+    param["ID"]     = QStringLiteral("123456");
+    param["Type"]   = 1;
+    param["Status"] = 1;
+    push["param"]   = param;
+
+    m_rpc.push(push);
+    addStatusMessage(QStringLiteral("✓ Push 发送成功"));
+}
+
+// 测试同步INVOKE方法
+void MainWindow::onInvokeClicked()
+{
+    if (!m_pipeSucc) {
+        addStatusMessage(QStringLiteral("请先建立连接"));
+        return;
+    }
+
+    QJsonObject resp;
+    int ret = m_rpc.invoke(createRpcRequest(QStringLiteral("test_invoke")), resp, 30000);
+    const int code = resp.value(QStringLiteral("code")).toInt();
+    if (ret == 0 && code == 0) {
+        addStatusMessage(QStringLiteral("✓ 同步 Invoke 成功"));
+    } else {
+        addStatusMessage(QStringLiteral("✗ 同步 Invoke 失败，返回码: ") + QString::number(ret));
+    }
+}
+
+// 测试异步INVOKE方法
+void MainWindow::onInvokeAsyncClicked()
+{
+    if (!m_pipeSucc) {
+        addStatusMessage(QStringLiteral("请先建立连接"));
+        return;
+    }
+
+    m_rpc.invokeAsync(createRpcRequest(QStringLiteral("test_invoke_async")),
+                      [this](int ret, const QJsonObject &resp) {
+        const int code = resp.value(QStringLiteral("code")).toInt();
+        if (ret == 0 && code == 0) {
+            addStatusMessage(QStringLiteral("✓ 异步 Invoke 成功"));
+        } else {
+            addStatusMessage(QStringLiteral("✗ 异步 Invoke 失败，返回码: ") + QString::number(ret));
+        }
+    });
+
+    addStatusMessage(QStringLiteral("异步测试已启动，不阻塞界面"));
+}
+
+// 消息响应
+void MainWindow::handleRemoteNotify(const QJsonObject &msg)
+{
+    const QString method = msg.value(QStringLiteral("method")).toString();
+
+    if (method == QStringLiteral("setsize")) {
+        const QJsonObject param = msg.value(QStringLiteral("param")).toObject();
+        const int w = param.value(QStringLiteral("width")).toInt();
+        const int h = param.value(QStringLiteral("height")).toInt();
+        if (w > 0 && h > 0) {
+            // 保证在 Qt UI 线程中调整窗口
+            QMetaObject::invokeMethod(this, [this, w, h]() {
+                resizeEmbeddedWindow(w, h);
+            }, Qt::QueuedConnection);
+        }
+    } else if (method == QStringLiteral("close")) {
+        // 收到 Cosmos 组件发来的 close 事件，关闭 Qt Demo 进程
+        QMetaObject::invokeMethod(this, [this]() {
+            this->close();
+            QCoreApplication::quit();
+        }, Qt::QueuedConnection);
+    }
+}
+~~~
 
 ### 进程消息透传到另一组件
 
@@ -2287,5 +2726,167 @@ else
 	notifyWidgetFunc(strGroup.c_str(), (InvokeType)nInvokeType, &request, false);
 }
 
+```
+
+#### Qt示例
+
+##### 1）调用
+
+```cpp
+void invokeWidget(const QString &group,
+                  const QString &type,
+                  const QJsonObject &req,
+                  std::function<void(int, QJsonObject)> cb)
+{
+    if (!m_inited) {
+        QJsonObject empty;
+        cb(-1, empty);
+        return;
+    }
+
+    const std::string id     = genUuid();
+    const std::string method = req.value(QStringLiteral("method")).toString().toStdString();
+
+    const auto paramVal = req.value(QStringLiteral("param"));
+    Json::Value jsonParam = Json::objectValue;
+    if (!paramVal.isNull()) {
+        jsonFromQJson(paramVal.toObject(), jsonParam);
+    }
+
+    const std::string grp  = group.toStdString();
+    const std::string typeStr = type.toStdString();
+    InvokeType itype = InvokeType::Global;
+    if (typeStr == "Group")
+        itype = InvokeType::Group;
+    else if (typeStr == "Instance")
+        itype = InvokeType::Instance;
+
+    const std::string paramStr = jsonParam.toStyledString();
+    void *rpcIn = CreateRpcRequest(id.c_str(), method.c_str(), paramStr.c_str());
+    if (!rpcIn) {
+        QJsonObject empty;
+        cb(-1, empty);
+        return;
+    }
+
+    std::thread([this, grp, itype, rpcIn, cb]() {
+        void *outPtr = nullptr;
+        int outSize  = 0;
+        RET_CALL ret = InvokeWidget(grp.c_str(), itype, rpcIn, false, &outPtr, &outSize, 30000);
+
+        QJsonObject respObj;
+        int code = static_cast<int>(ret);
+
+        if (ret == RET_CALL::Ok && outPtr && outSize > 0) {
+            std::string resultStr(static_cast<char*>(outPtr), outSize);
+
+            Json::CharReaderBuilder builder;
+            Json::Value root;
+            std::string errs;
+            std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+            if (reader->parse(resultStr.c_str(),
+                              resultStr.c_str() + resultStr.size(),
+                              &root, &errs)) {
+                QJsonObject resultQ;
+                qjsonFromJson(root, resultQ);
+                respObj = resultQ;
+            }
+
+            FreeRpcAllocMemory(outPtr);
+        }
+
+        cb(code, respObj);
+        FreeRpcAllocMemory(rpcIn);
+    }).detach();
+}
+```
+
+##### 2）通知
+
+~~~cpp
+void notifyWidget(const QString &group,
+                  const QString &type,
+                  const QJsonObject &req)
+{
+    if (!m_inited)
+        return;
+
+    const std::string method = req.value(QStringLiteral("method")).toString().toStdString();
+
+    const auto paramVal = req.value(QStringLiteral("param"));
+    Json::Value jsonParam = Json::objectValue;
+    if (!paramVal.isNull()) {
+        jsonFromQJson(paramVal.toObject(), jsonParam);
+    }
+
+    const std::string grp  = group.toStdString();
+    const std::string typeStr = type.toStdString();
+    InvokeType itype = InvokeType::Global;
+    if (typeStr == "Group")
+        itype = InvokeType::Group;
+    else if (typeStr == "Instance")
+        itype = InvokeType::Instance;
+
+    const std::string paramStr = jsonParam.toStyledString();
+    std::string id; // 通知可不需要 id
+    void *rpcIn = CreateRpcRequest(id.c_str(), method.c_str(), paramStr.c_str());
+    if (!rpcIn)
+        return;
+
+    NotifyWidget(grp.c_str(), itype, rpcIn, false);
+    FreeRpcAllocMemory(rpcIn);
+}
+~~~
+
+##### 3）示例
+
+```cpp
+void MainWindow::onGlobalSendClicked()
+{
+    const QString group = m_editGroup->text();
+    const bool isInvoke = (m_comboType->currentIndex() == 0);
+    const QString text  = m_editContent->text();
+
+    QJsonObject param;
+    param["text"] = text;
+    QJsonObject req = createRpcRequest(QStringLiteral("textchanged"), param);
+
+    if (isInvoke) {
+        m_rpc.invokeWidget(group, QStringLiteral("Global"), req,
+                           [this](int ret, const QJsonObject &resp) {
+            if (ret == 0) {
+                addStatusMessage(QStringLiteral("全局请求成功: ")
+                                 + resp.value(QStringLiteral("result")).toString());
+            }
+        });
+    } else {
+        m_rpc.notifyWidget(group, QStringLiteral("Global"), req);
+        addStatusMessage(QStringLiteral("全局通知已发送"));
+    }
+}
+
+void MainWindow::onGroupSendClicked()
+{
+    const QString group = m_editGroup->text();
+    const bool isInvoke = (m_comboType->currentIndex() == 0);
+    const QString text  = m_editContent->text();
+
+    QJsonObject param;
+    param["text"] = text;
+    QJsonObject req = createRpcRequest(QStringLiteral("textchanged"), param);
+
+    if (isInvoke) {
+        m_rpc.invokeWidget(group, QStringLiteral("Group"), req,
+                           [this](int ret, const QJsonObject &resp) {
+            if (ret == 0) {
+                addStatusMessage(QStringLiteral("组请求成功: ")
+                                 + resp.value(QStringLiteral("result")).toString());
+            }
+        });
+    } else {
+        m_rpc.notifyWidget(group, QStringLiteral("Group"), req);
+        addStatusMessage(QStringLiteral("组通知已发送"));
+    }
+}
 ```
 

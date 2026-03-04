@@ -12,14 +12,13 @@ int main(int argc, char *argv[])
     QString pipeName;
     QString wndInfo;
 
-    // 简单解析命令行参数：--pipe=xxx  --wnd-info=parent|w|h
-    for (int i = 1; i < argc; ++i) {
-        QString arg = QString::fromLocal8Bit(argv[i]);
-        if (arg.startsWith("--pipe=")) {
-            pipeName = arg.mid(QStringLiteral("--pipe=").size());
-        } else if (arg.startsWith("--wnd-info=")) {
-            wndInfo = arg.mid(QStringLiteral("--wnd-info=").size());
-        }
+    // 仅兼容旧版：args[0] = pipeName, args[1] = wndInfo（与 TestWpf 一致）
+    // Cosmos 进程侧按此顺序传参
+    if (argc > 1) {
+        pipeName = QString::fromLocal8Bit(argv[1]);
+    }
+    if (argc > 2) {
+        wndInfo = QString::fromLocal8Bit(argv[2]);
     }
 
     MainWindow w;

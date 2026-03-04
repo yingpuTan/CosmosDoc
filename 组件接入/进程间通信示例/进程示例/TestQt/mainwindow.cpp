@@ -2,6 +2,7 @@
 
 #include <QGridLayout>
 #include <QVBoxLayout>
+#include <QMessageBox>
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QLineEdit>
@@ -14,6 +15,7 @@
 #include <QDateTime>
 #include <QTime>
 #include <QJsonDocument>
+#include <QCoreApplication>
 
 #ifdef Q_OS_WIN
 #  include <windows.h>
@@ -25,6 +27,7 @@
 
 QSet<QString> MainWindow::s_subSet;
 QMap<QString, MainWindow::AccountInfo> MainWindow::s_accountMap;
+RpcClient *RpcClient::s_instance = nullptr;
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -50,11 +53,10 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowTitle(QStringLiteral("Cosmos RPC Qt 测试 Demo"));
     resize(900, 500);
 
-    // 如果上层通过命令行传入了父窗口信息，则尝试做窗口嵌入
-    setupParentWindow();
-
-    // 构造结束后尝试连接管道
-    connectPipe();
+    // 注册来自 PipeClient 的 Notify 回调（比如 setsize）
+    m_rpc.setNotifyHandler([this](const QJsonObject &msg) {
+        handleRemoteNotify(msg);
+    });
 }
 
 MainWindow::~MainWindow()
@@ -62,6 +64,24 @@ MainWindow::~MainWindow()
     if (m_logStream) {
         *m_logStream << "========== 日志结束 ==========\n";
         m_logStream->flush();
+    }
+}
+
+void MainWindow::setPipeName(const QString &name)
+{
+    m_pipeName = name;
+    // 如果在构造后设置了管道名，自动尝试连接
+    if (!m_pipeSucc && !m_pipeName.isEmpty()) {
+        connectPipe();
+    }
+}
+
+void MainWindow::setWndInfo(const QString &info)
+{
+    m_wndInfo = info;
+    // 在设置好窗口信息后，尝试做一次嵌入
+    if (!m_wndInfo.isEmpty()) {
+        setupParentWindow();
     }
 }
 
@@ -189,7 +209,7 @@ void MainWindow::connectSignals()
 void MainWindow::connectPipe()
 {
     if (m_pipeName.isEmpty()) {
-        addStatusMessage(QStringLiteral("未提供管道名称，可在命令行通过 --pipe=xxx 指定"));
+        addStatusMessage(QStringLiteral("未提供管道名称，请通过命令行第一个参数传入管道名"));
         return;
     }
 
@@ -291,6 +311,57 @@ QJsonObject MainWindow::createRpcRequest(const QString &method,
     obj["method"] = method;
     obj["param"]  = param;
     return obj;
+}
+
+void MainWindow::resizeEmbeddedWindow(int w, int h)
+{
+#ifdef Q_OS_WIN
+    HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (!hwnd)
+        return;
+    ::MoveWindow(hwnd, 0, 0, w, h, TRUE);
+#elif defined(Q_OS_LINUX)
+    WId wid = winId();
+    Window child = static_cast<Window>(wid);
+    Display *dpy = XOpenDisplay(nullptr);
+    if (!dpy)
+        return;
+    XMoveResizeWindow(dpy, child, 0, 0,
+                      static_cast<unsigned int>(w),
+                      static_cast<unsigned int>(h));
+    XFlush(dpy);
+    XCloseDisplay(dpy);
+#endif
+}
+
+void MainWindow::handleRemoteNotify(const QJsonObject &msg)
+{
+    const QString method = msg.value(QStringLiteral("method")).toString();
+
+    //QJsonDocument doc(msg); 
+    //    QString jsonString = doc.toJson(QJsonDocument::Compact); 
+     //   QMessageBox::information(nullptr , "handleRemoteNotify", jsonString);
+    if (method == QStringLiteral("setsize")) {
+        // 转换为 JSON 字符串 
+        
+        const QJsonObject param = msg.value(QStringLiteral("param")).toObject();
+        const int w = param.value(QStringLiteral("width")).toInt();
+        const int h = param.value(QStringLiteral("height")).toInt();
+        if (w > 0 && h > 0) {
+            // 保证在 Qt UI 线程中调整窗口
+            QMetaObject::invokeMethod(this, [this, w, h]() {
+                resizeEmbeddedWindow(w, h);
+            }, Qt::QueuedConnection);
+        }
+    }else if (method == QStringLiteral("close")) {
+        //QMessageBox::information(nullptr , "handleRemoteNotify", "close");
+        // 收到 Cosmos 组件发来的 close 事件，关闭 Qt Demo 进程
+        QMetaObject::invokeMethod(this, [this]() {
+            // 先关闭主窗口，Qt 事件循环结束后进程退出
+            this->close();
+            QCoreApplication::quit();
+        }, Qt::QueuedConnection);
+    }
 }
 
 void MainWindow::addStatusMessage(const QString &msg)

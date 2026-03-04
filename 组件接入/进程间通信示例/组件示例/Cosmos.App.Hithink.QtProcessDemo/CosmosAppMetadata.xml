@@ -5,7 +5,7 @@
     <Version>1.0.0.0</Version>
     <Base>
 	  <!-- 包id，填入在管理端申请应用是返回的Appid -->
-      <Guid>qt-process-demo-guid</Guid>
+      <Guid>a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d</Guid>
       <Name>
         <zh-CN>Qt进程demo</zh-CN>
         <en-US>Qt进程demo</en-US>
@@ -20,7 +20,7 @@
       <Widget>
         <Base>
 		  <!-- 组件id，填入在管理端申请应用是添加组件返回的Widgetid -->
-          <Guid>qt-process-demo-widget-guid</Guid>  
+          <Guid>9f8e7d6c-5b4a-4321-9876-54321fedcba0</Guid>  
           <Name>
             <zh-CN>Qt进程demo</zh-CN>
             <en-US>Qt进程demo</en-US>

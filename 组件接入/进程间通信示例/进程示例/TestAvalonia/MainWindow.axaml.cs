@@ -175,7 +175,7 @@ namespace TestAvalonia
                     WriteToLogFile($"设置初始 Opacity=0 失败: {ex.GetType().Name} - {ex.Message}");
                 }
 #endif
-                
+
                 // 初始化全局变量
                 AccountInfo info = new AccountInfo
                 {
@@ -250,7 +250,7 @@ namespace TestAvalonia
             try
             {
                 WriteToLogFile("MainWindow_Opened 事件触发");
-                
+
                 // 注册回调函数
                 RegisterCallBack();
                 WriteToLogFile("回调函数注册完成");
@@ -279,7 +279,7 @@ namespace TestAvalonia
                 {
                     WriteToLogFile("未提供窗口信息，跳过窗口嵌入");
                 }
-                
+
                 WriteToLogFile("MainWindow_Opened 事件处理完成");
             }
             catch (Exception ex)
@@ -471,24 +471,24 @@ namespace TestAvalonia
                 // 设置父窗口（关键步骤）
                 // 注意：SetParent 的参数类型，TestWpf 中使用的是 int，这里使用 IntPtr
                 IntPtr oldParent = SetParent(curHwnd, parentHwnd);
-                
+
                 // 清除错误状态
                 Marshal.GetLastWin32Error();
-                
+
                 // 立即验证父窗口是否设置成功
                 IntPtr verifyParent = GetParent(curHwnd);
                 if (verifyParent != parentHwnd)
                 {
                     AddStatusMessage($"第一次 SetParent 后验证失败。当前父窗口: {verifyParent.ToInt64()}, 期望: {parentHwnd.ToInt64()}");
-                    
+
                     // 再次设置窗口样式，确保样式正确
                     SetWindowLong(curHwnd, -16, lPreStyle);
                     SetWindowLong(curHwnd, -20, lPreExStyle);
-                    
+
                     // 尝试再次设置父窗口
                     IntPtr retryParent = SetParent(curHwnd, parentHwnd);
                     Marshal.GetLastWin32Error(); // 清除错误状态
-                    
+
                     // 再次验证
                     verifyParent = GetParent(curHwnd);
                     if (verifyParent != parentHwnd)
@@ -512,14 +512,14 @@ namespace TestAvalonia
                 {
                     this.Width = width;
                     this.Height = height;
-                    
+
                     // 使用 SetWindowPos 强制更新窗口位置和大小
-                    SetWindowPos(curHwnd, IntPtr.Zero, 0, 0, (int)width, (int)height, 
+                    SetWindowPos(curHwnd, IntPtr.Zero, 0, 0, (int)width, (int)height,
                         SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
-                    
+
                     // 也调用 MoveWindow 确保位置正确
                     MoveWindow(curHwnd, 0, 0, (int)width, (int)height, false);
-                    
+
                     // 强制刷新窗口
                     InvalidateRect(curHwnd, IntPtr.Zero, true);
                     UpdateWindow(curHwnd);
@@ -551,7 +551,7 @@ namespace TestAvalonia
                             IntPtr retryParent = SetParent(curHwnd, parentHwnd);
                             if (retryParent != IntPtr.Zero)
                             {
-                                SetWindowPos(curHwnd, IntPtr.Zero, 0, 0, (int)width, (int)height, 
+                                SetWindowPos(curHwnd, IntPtr.Zero, 0, 0, (int)width, (int)height,
                                     SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
                                 AddStatusMessage("已重试设置父窗口");
                             }
@@ -813,7 +813,7 @@ namespace TestAvalonia
                 {
                     var platformImplType = this.PlatformImpl.GetType();
                     // 检查是否是 Windows 平台的实现
-                    if (platformImplType.FullName?.Contains("Win32") == true || 
+                    if (platformImplType.FullName?.Contains("Win32") == true ||
                         platformImplType.FullName?.Contains("Windows") == true)
                     {
                         var handleProperty = platformImplType.GetProperty("Handle",
@@ -1382,10 +1382,10 @@ namespace TestAvalonia
                 Spacing = 10
             };
 
-            var textBlock = new TextBlock 
-            { 
-                Text = message, 
-                TextWrapping = TextWrapping.Wrap 
+            var textBlock = new TextBlock
+            {
+                Text = message,
+                TextWrapping = TextWrapping.Wrap
             };
 
             var buttonPanel = new StackPanel
@@ -1395,10 +1395,10 @@ namespace TestAvalonia
                 Margin = new Thickness(0, 10, 0, 0)
             };
 
-            var okButton = new Button 
-            { 
-                Content = "确定", 
-                Width = 80 
+            var okButton = new Button
+            {
+                Content = "确定",
+                Width = 80
             };
 
             okButton.Click += (s, e) => dialog.Close();
@@ -1423,7 +1423,7 @@ namespace TestAvalonia
 #endif
             // 关闭日志文件
             CloseLogFile();
-            
+
             wrapper?.Exit();
             base.OnClosed(e);
         }

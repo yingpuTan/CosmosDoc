@@ -4,7 +4,7 @@
     <TargetFramework>net7.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-	<Version>0.0.64</Version>
+	<Version>1.0.9</Version>
 	<UseWPF>true</UseWPF>
 	<Description>组件demo</Description>
 	<Title>组件demo</Title>
@@ -29,11 +29,6 @@
 		<EmbeddedResource Include="Config.json" />
 	</ItemGroup>
 	<ItemGroup>
-	  <PackageReference Include="Cosmos.App.Sdk" Version="1.0.7" />
-	  <PackageReference Include="Cosmos.App.Sdk.Windows" Version="1.0.7" />
-	  <PackageReference Include="Cosmos.DataAccess" Version="1.0.7" />
-	  <PackageReference Include="Cosmos.DataAccess.Trade" Version="1.0.7" />
-	  <PackageReference Include="Cosmos.DataAccess.Trade.HighGate" Version="1.0.7" />
 	  <PackageReference Include="Cosmos.OsslSignCode.Native" Version="0.0.5" />
 	  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 	</ItemGroup>
@@ -44,6 +39,11 @@
 		</Content>
 	</ItemGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\Cosmos.App.Hithink.Demo.Shared\Cosmos.App.Hithink.Demo.Shared.shproj" />
+	  <ProjectReference Include="..\Cosmos.App.Sdk.Windows\Cosmos.App.Sdk.Windows.csproj" />
+	  <ProjectReference Include="..\Cosmos.App.Sdk\Cosmos.App.Sdk.csproj" />
+	  <ProjectReference Include="..\Cosmos.DataAccess.Trade.HighGate\Cosmos.DataAccess.Trade.HighGate.csproj" />
+	  <ProjectReference Include="..\Cosmos.DataAccess.Trade\Cosmos.DataAccess.Trade.csproj" />
+	  <ProjectReference Include="..\Cosmos.DataAccess\Cosmos.DataAccess.csproj" />
 	</ItemGroup>
+	<Import Project="..\Cosmos.App.Hithink.Demo.Shared\Cosmos.App.Hithink.Demo.Shared.projitems" Label="Shared" />
 </Project>

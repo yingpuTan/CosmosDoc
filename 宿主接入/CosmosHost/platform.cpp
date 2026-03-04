@@ -2,9 +2,9 @@
 
 #include <atomic>
 #include <cstring>
-#include <filesystem>
 #include <random>
 #include <thread>
+#include <string>
 
 #if defined(_WIN32)
 #  define NOMINMAX
@@ -28,16 +28,35 @@ std::string executable_dir() {
 #if defined(_WIN32)
     char buffer[MAX_PATH] = {0};
     DWORD len = GetModuleFileNameA(nullptr, buffer, MAX_PATH);
-    if (len == 0 || len >= MAX_PATH) return std::filesystem::current_path().string();
-    std::filesystem::path p(buffer);
-    return p.parent_path().string();
+    if (len == 0 || len >= MAX_PATH) {
+        // 如果获取失败，返回当前目录
+        char curDir[MAX_PATH] = {0};
+        DWORD curLen = GetCurrentDirectoryA(MAX_PATH, curDir);
+        return (curLen > 0 && curLen < MAX_PATH) ? std::string(curDir) : std::string(".");
+    }
+    std::string path(buffer);
+    // 查找最后一个路径分隔符
+    size_t pos = path.find_last_of("\\/");
+    if (pos != std::string::npos) {
+        return path.substr(0, pos);
+    }
+    return ".";
 #else
     char buf[4096] = {0};
     ssize_t len = ::readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-    if (len <= 0) return std::filesystem::current_path().string();
+    if (len <= 0) {
+        // 如果获取失败，返回当前目录
+        char* cwd = ::getcwd(buf, sizeof(buf) - 1);
+        return cwd ? std::string(cwd) : std::string(".");
+    }
     buf[len] = '\0';
-    std::filesystem::path p(buf);
-    return p.parent_path().string();
+    std::string path(buf);
+    // 查找最后一个路径分隔符
+    size_t pos = path.find_last_of('/');
+    if (pos != std::string::npos) {
+        return path.substr(0, pos);
+    }
+    return ".";
 #endif
 }
 
@@ -104,13 +123,16 @@ void* DynamicLibrary::symbol(const char* name) const {
 std::string DynamicLibrary::last_error() const { return last_error_; }
 
 struct PeriodicTimer::Impl {
-    std::atomic<bool> stop{false};
-    std::thread worker;
+    std::atomic<bool> stop;
+    std::thread       worker;
+
+    Impl() : stop(false) {}
 };
 
 PeriodicTimer::PeriodicTimer(std::chrono::milliseconds interval, Callback cb)
-    : impl_(std::make_unique<Impl>()) {
-    impl_->worker = std::thread([interval, cb = std::move(cb), impl = impl_.get()]() mutable {
+    : impl_(std::unique_ptr<Impl>(new Impl())) {
+    Impl* impl = impl_.get();
+    impl->worker = std::thread([interval, cb, impl]() mutable {
         while (!impl->stop.load(std::memory_order_relaxed)) {
             std::this_thread::sleep_for(interval);
             if (impl->stop.load(std::memory_order_relaxed)) break;
@@ -137,11 +159,13 @@ std::string gbk_to_utf8(const std::string& s) {
     int wide_len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), -1, nullptr, 0);
     if (wide_len == 0) return "";
     std::wstring wide(static_cast<size_t>(wide_len), L'\0');
-    if (MultiByteToWideChar(CP_ACP, 0, s.c_str(), -1, wide.data(), wide_len) == 0) return "";
+    // 使用 &wide[0] 获取非 const 指针（C++11 中 std::wstring 保证连续存储）
+    if (MultiByteToWideChar(CP_ACP, 0, s.c_str(), -1, &wide[0], wide_len) == 0) return "";
     int utf8_len = WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, nullptr, 0, nullptr, nullptr);
     if (utf8_len == 0) return "";
     std::string out(static_cast<size_t>(utf8_len), '\0');
-    if (WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, out.data(), utf8_len, nullptr, nullptr) == 0) return "";
+    // 使用 &out[0] 获取非 const 指针（C++11 中 std::string 保证连续存储）
+    if (WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, &out[0], utf8_len, nullptr, nullptr) == 0) return "";
     if (!out.empty() && out.back() == '\0') out.pop_back();
     return out;
 #else
@@ -154,11 +178,13 @@ std::string utf8_to_gbk(const std::string& s) {
     int wide_len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
     if (wide_len == 0) return "";
     std::wstring wide(static_cast<size_t>(wide_len), L'\0');
-    if (MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, wide.data(), wide_len) == 0) return "";
+    // 使用 &wide[0] 获取非 const 指针（C++11 中 std::wstring 保证连续存储）
+    if (MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, &wide[0], wide_len) == 0) return "";
     int gbk_len = WideCharToMultiByte(936, 0, wide.c_str(), -1, nullptr, 0, nullptr, nullptr);
     if (gbk_len == 0) return "";
     std::string out(static_cast<size_t>(gbk_len), '\0');
-    if (WideCharToMultiByte(936, 0, wide.c_str(), -1, out.data(), gbk_len, nullptr, nullptr) == 0) return "";
+    // 使用 &out[0] 获取非 const 指针（C++11 中 std::string 保证连续存储）
+    if (WideCharToMultiByte(936, 0, wide.c_str(), -1, &out[0], gbk_len, nullptr, nullptr) == 0) return "";
     if (!out.empty() && out.back() == '\0') out.pop_back();
     return out;
 #else

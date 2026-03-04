@@ -1,0 +1,68 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "调试 CosmosQtHost (GDB)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/CosmosQtHost",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "${env:LD_LIBRARY_PATH}:${env:QT_DIR}/lib:/usr/lib/x86_64-linux-gnu/qt5/lib:${workspaceFolder}/build"
+                },
+                {
+                    "name": "QT_PLUGIN_PATH",
+                    "value": "${env:QT_DIR}/plugins:/data/home/hexin/Qt5.12.2/5.12.2/gcc_64/plugins"
+                },
+                { 
+                    "name": "QT_QPA_PLATFORM",
+                     "value": "xcb" 
+                } 
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "为 gdb 启用整齐打印",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "将反汇编风格设置为 Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "构建 CosmosQtHost",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "logging": {
+                "moduleLoad": false,
+                "trace": false,
+                "engineLogging": false,
+                "programOutput": true,
+                "exceptions": true
+            }
+        },
+        {
+            "name": "附加到进程 (GDB)",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "${workspaceFolder}/build/CosmosQtHost",
+            "processId": "${command:pickProcess}",
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "为 gdb 启用整齐打印",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "miDebuggerPath": "/usr/bin/gdb"
+        }
+    ]
+}
+

@@ -5,7 +5,7 @@
     <Version>1.0.0.0</Version>
     <Base>
 	  <!-- 包id，填入在管理端申请应用是返回的Appid -->
-      <Guid>69cc84f4-56d3-4ece-a229-4df73af813a8</Guid>
+      <Guid>b8f2e9a1-3c4d-4f5e-9a6b-7c8d9e0f1a2b</Guid>
       <Name>
         <zh-CN>Cosmos组件demo (Avalonia)</zh-CN>
         <en-US>Cosmos组件demo (Avalonia)</en-US>
@@ -20,7 +20,7 @@
       <Widget>
         <Base>
 		  <!-- 组件id，填入在管理端申请应用是添加组件返回的Widgetid -->
-          <Guid>e69eea54-dbd9-4bb7-a948-078adaf91ac4</Guid>  
+          <Guid>d3e4f5a6-7b8c-4d9e-a1b2-c3d4e5f6a7b8</Guid>  
           <Name>
             <zh-CN>Cosmos组件demo (Avalonia)</zh-CN>
             <en-US>Cosmos组件demo (Avalonia)</en-US>

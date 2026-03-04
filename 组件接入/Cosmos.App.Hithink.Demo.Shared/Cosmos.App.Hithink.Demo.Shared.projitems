@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>d91cef85-0c7f-4333-a837-38f36aa72560</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Cosmos.App.Hithink.Demo.Shared</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)AccountInfo.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)ComDemoProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Config.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GetUserIdResponse.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)JsRequest.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SetTextRequest.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Struct.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TextChange.cs" />
+  </ItemGroup>
+</Project>

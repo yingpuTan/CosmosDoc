@@ -1,0 +1,33 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/include/rapidjson",
+                "${workspaceFolder}/../CosmosHost",
+                "${workspaceFolder}/../CosmosHost/include",
+                "/usr/include",
+                "/usr/include/qt5",
+                "/usr/include/qt5/QtCore",
+                "/usr/include/qt5/QtGui",
+                "/usr/include/qt5/QtWidgets"
+            ],
+            "defines": [
+                "__linux__",
+                "__GNUC__",
+                "QT_CORE_LIB",
+                "QT_GUI_LIB",
+                "QT_WIDGETS_LIB"
+            ],
+            "compilerPath": "/usr/bin/g++",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "linux-gcc-x64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}
+

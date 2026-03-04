@@ -9,7 +9,6 @@ using System.Text.Json.Nodes;
 using Newtonsoft.Json.Linq;
 
 using Cosmos.App.Sdk.v1;
-using Cosmos.App.Sdk.Windows;
 using Cosmos.DataAccess.v1;
 using Cosmos.DataAccess.v1.CosmosIntegration;
 using Cosmos.App.Sdk.v1.Primitives;
@@ -20,11 +19,12 @@ using Cosmos.DataAccess.Trade.v1;
 using Cosmos.DataAccess.Trade.v1.Protocol;
 using Cosmos.App.Hithink.Demo.Shared;
 using Avalonia.Controls;
+using Cosmos.App.Sdk.Avalonia;
 
 namespace Cosmos.App.Hithink.AvaloniaComDemo
 {
     public class AvaloniaComDemoGui :
-        AvaloniaCosmosAppWidget, //组件基类，必须继承自此类，并且需要实现类中提供的抽象方法。
+        AvaloniaCosmAppWidget, //组件基类，必须继承自此类，并且需要实现类中提供的抽象方法。
         ICosmosDataInteraction, //需要访问行情数据底座，需实现此接口
         ICosmosAppAccessor, //组件业务接口方法，提供方法给外部调用们需要实现子接口
         ICosmosTradeDataInteraction,
@@ -273,7 +273,20 @@ namespace Cosmos.App.Hithink.AvaloniaComDemo
                 //解析请求参数
                 ContextInjection.ThisAppContext.AppLogger?.Log(CosmosLogLevel.Information, $"WebMessageReceived args:{args?.WebMessageAsJson}");
                 var message = JsonSerializer.Deserialize<List<object>>(args.WebMessageAsJson);
-                var requestJson = message[0];
+
+                var name = message[0];
+                var browser_id = message[1];
+                var dataJson = message[2].ToString();
+                var data = JsonSerializer.Deserialize<List<object>>(dataJson);
+                var context_id = data[0];
+                var request_id = data[1];
+                var requestJson = data[2];
+                var persistent = data[3];
+
+                var context = new List<object>
+                {
+                    context_id, request_id
+                };
 
                 if (string.IsNullOrEmpty(requestJson?.ToString()))
                 {
@@ -281,16 +294,22 @@ namespace Cosmos.App.Hithink.AvaloniaComDemo
                 }
                 //处理请求
                 var result = await MessageProcessHandler(requestJson.ToString());
-                //请求成功应答
                 if (result.Item1 == 200)
                 {
-                    await _webView.ExecuteScript(args._SussFunc, result.Item2);
+                    context.Add(true);
+                    context.Add(result.Item2);
                 }
-                //请求错误应答
                 else
                 {
-                    await _webView.ExecuteScript(args._FailFunc, result.Item1, result.Item2);
+                    context.Add(false);
+                    context.Add(result.Item1);
+                    context.Add(result.Item2);
                 }
+                var javascript = new List<object>()
+                {
+                    name, browser_id, JsonSerializer.Serialize(context)
+                };
+                await _webView.ExecuteScriptAsync(JsonSerializer.Serialize(javascript));
             }
             catch (Exception ex)
             {
@@ -348,9 +367,19 @@ namespace Cosmos.App.Hithink.AvaloniaComDemo
         {
             if (e.IsSuccess)
             {
+
                 //调用js的GetAdd方法
-                var result = await _webView.ExecuteScriptAsync($"GetAdd(10,20)");
-                Console.WriteLine($"Call JS Function Add, Result{result}");
+                object[] parem = new object[3];
+                parem[0] = "GetAdd";
+                parem[1] = 10;
+                parem[2] = 20;
+
+                var javascript = new List<object>()
+                {
+                    "CallJsJson", "", JsonSerializer.Serialize(parem)
+                };
+
+                await _webView.ExecuteScriptAsync(JsonSerializer.Serialize(javascript));
             }
         }
 

@@ -17,6 +17,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RpcWrapper", "RpcWrapper\Rp
 		{31B44B8B-5C38-44F3-A00A-188B774CA018} = {31B44B8B-5C38-44F3-A00A-188B774CA018}
 	EndProjectSection
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestAvalonia", "TestAvalonia\TestAvalonia.csproj", "{816C453C-2116-4A15-88DB-5A029003E2CE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -129,6 +131,30 @@ Global
 		{BCA2DF87-4AED-4419-8C14-AB83AB2CC354}.Release|x64.Build.0 = Release|Any CPU
 		{BCA2DF87-4AED-4419-8C14-AB83AB2CC354}.Release|x86.ActiveCfg = Release|Any CPU
 		{BCA2DF87-4AED-4419-8C14-AB83AB2CC354}.Release|x86.Build.0 = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Debug|x64.Build.0 = Debug|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Debug|x86.Build.0 = Debug|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_dll|Any CPU.ActiveCfg = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_dll|Any CPU.Build.0 = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_dll|x64.ActiveCfg = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_dll|x64.Build.0 = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_dll|x86.ActiveCfg = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_dll|x86.Build.0 = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_exe|Any CPU.ActiveCfg = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_exe|Any CPU.Build.0 = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_exe|x64.ActiveCfg = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_exe|x64.Build.0 = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_exe|x86.ActiveCfg = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release_exe|x86.Build.0 = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release|x64.ActiveCfg = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release|x64.Build.0 = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release|x86.ActiveCfg = Release|Any CPU
+		{816C453C-2116-4A15-88DB-5A029003E2CE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Media;
@@ -46,14 +47,20 @@ namespace Cosmos.App.Hithink.AvaloniaComDemo
             {
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
                 VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                Text = content
+                Text = content,
+                Foreground = levelBrushes.Foreground
             };
-            var toast = new AvaloniaToast()
+            var toast = new AvaloniaToast();
+
+            // 使用 Border 承载内容并设置背景色
+            var border = new Border
             {
                 Background = levelBrushes.Background,
-                Foreground = levelBrushes.Foreground,
-                Child = contentTextBlock,
+                Padding = new Thickness(12, 6),
+                Child = contentTextBlock
             };
+
+            toast.Child = border;
             
             var timer = new DispatcherTimer();
             timer.Interval = TimeSpan.FromMilliseconds(milliseconds);

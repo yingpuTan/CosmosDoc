@@ -77,12 +77,12 @@ namespace Cosmos.App.Hithink.ComDemo
                         if (handle != null)
                         {
                             string strSubscriberid = dicTextSub[strUUid];
-                            TextChange textPush = new TextChange()
+                            Cosmos.App.Hithink.Demo.Shared.TextChange textPush = new Cosmos.App.Hithink.Demo.Shared.TextChange()
                             {
                                 text = textBox.Text
                             };
                             /// 触发回调,通知订阅者文本框发生改变
-                            handle(strSubscriberid, strUUid, JsonSerializer.Serialize<TextChange>(textPush));
+                            handle(strSubscriberid, strUUid, JsonSerializer.Serialize<Cosmos.App.Hithink.Demo.Shared.TextChange>(textPush));
                         }
                     }
                 }
@@ -252,12 +252,12 @@ namespace Cosmos.App.Hithink.ComDemo
         {
             ///获取当前实例唯一标识
             var cosmosOperator = Convert.ToString(_contextInjection.ThisInstanceContext.InstanceId);
-            TextChange textInvoke = new TextChange()
+            Cosmos.App.Hithink.Demo.Shared.TextChange textInvoke = new Cosmos.App.Hithink.Demo.Shared.TextChange()
             {
                 text = text_name.Text
             };
             //向宿主调用comTestSetText方法,需要宿主实现该方法
-            string result = await _productAccessor.InvokeAsync(cosmosOperator, "comTestSetText", JsonSerializer.Serialize<TextChange>(textInvoke));
+            string result = await _productAccessor.InvokeAsync(cosmosOperator, "comTestSetText", JsonSerializer.Serialize<Cosmos.App.Hithink.Demo.Shared.TextChange>(textInvoke));
             WpfToast.Show("发送完成");
         }
         /// <summary>

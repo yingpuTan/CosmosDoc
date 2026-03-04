@@ -359,13 +359,10 @@ namespace Cosmos.App.Hithink.ProcessDemo.Shared
         /// <summary>
         /// 启动RPC服务器
         /// </summary>
-        public virtual async void StartRpcServer()
+        public virtual async void StartRpcServer(string strPath)
         {
             try
             {
-                // 1.获取进程所在路径
-                var clientDir = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location))), @"content\dependents\TestWpf.exe");
-                //var clientDir = @"D:\git\itrader\Cosmos_yinhe\Source\RpcClient\TestWpf\bin\Debug\net7.0-windows\win-x64\TestWpf.exe";
                 // 2.手动获取当前应用程序窗口句柄和真实窗口大小,组装命令行参数
                 var hwnd = GetWindowHandle();
                 var currentDpi = GetCurrentDpiScale();
@@ -376,7 +373,7 @@ namespace Cosmos.App.Hithink.ProcessDemo.Shared
                 string strCmd = $"{hwnd}|{(int)actualWidth}|{(int)actualHeight}";
 
                 // 3、启动进程通讯服务，并将当前父窗口的进程id和窗口大小通知对方进程、返回对方进程id
-                ProcessId = CreateRpcManager(clientDir, strCmd, _logger);
+                ProcessId = CreateRpcManager(strPath, strCmd, _logger);
                 if (ProcessId != 0)
                 {
                     //创建成功，向cosmos引擎设置进程信息
@@ -398,7 +395,7 @@ namespace Cosmos.App.Hithink.ProcessDemo.Shared
         /// <summary>
         /// Widget实例，用于传递给引擎
         /// </summary>
-        public object _widgetInstance { get; set; }
+        public ICosmosAppWidget _widgetInstance { get; set; }
 
         /// <summary>
         /// 释放RPC管理器

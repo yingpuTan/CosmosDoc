@@ -1,0 +1,13 @@
+<package>
+  <metadata>
+    <id>Cosmos.RpcClient</id>
+    <version>0.0.17</version>
+    <authors>THS</authors>
+    <owners>THS</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectUrl>https://10jaqka.com.cn/</projectUrl>
+    <description>Cosmos.RpcClient</description>
+    <releaseNotes>Cosmos.RpcClient</releaseNotes>
+    <copyright>Copyright ©2023 THS Corporation</copyright>
+  </metadata>
+</package>

@@ -11,12 +11,19 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Path = System.IO.Path;
+using Avalonia.VisualTree;
 
 namespace Cosmos.App.Hithink.QtProcessDemo
 {
     public class QtProcessDemoGui :
-        WpfCosmosAppProcessWidget //进程间通讯基类，支持跨平台
+        AvaloniaCosmosAppProcessWidget //进程间通讯基类，支持跨平台
     {
+
+        /// <summary>
+        /// 日志记录
+        /// </summary>
+        protected ICosmosAppLogger _logger { get; set; }
+
         private ProcessDemoGuiBase _baseImpl;
         private NativeControlHost _nativeHost;
         private double _dpiRatioFirst = 1;
@@ -126,6 +133,10 @@ namespace Cosmos.App.Hithink.QtProcessDemo
         /// </summary>
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
+            //绑定cosmos引擎提供的日志记录器
+            _logger = ContextInjection.ThisAppContext.AppLogger;
+            _logger?.Log(CosmosLogLevel.Information, "ComDemoGui 启动");
+
             await _baseImpl.StartAsync(cancellationToken);
         }
 

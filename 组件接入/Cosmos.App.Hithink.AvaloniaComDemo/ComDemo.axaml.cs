@@ -20,10 +20,11 @@ using Avalonia.Interactivity;
 using Cosmos.App.Hithink.Demo.Shared;
 using Avalonia.Threading;
 using static Cosmos.App.Hithink.AvaloniaComDemo.AvaloniaComDemoGui;
-using PushHandler = ISubscriberRaw<string, string, string, string, string, int>.PushDataHandler;
 
 namespace Cosmos.App.Hithink.AvaloniaComDemo
 {
+    using PushHandler = ISubscriberRaw<string, string, string, string, string, int>.PushDataHandler;
+
     /// <summary>
     /// Interaction logic for ComDemo.axaml
     /// </summary>

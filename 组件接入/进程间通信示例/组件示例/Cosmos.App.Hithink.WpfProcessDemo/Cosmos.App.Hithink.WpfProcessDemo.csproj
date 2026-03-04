@@ -12,7 +12,6 @@
 	<PackageTags>2a596dc9-6f3e-4ed2-8c33-c2f4aa9309bb</PackageTags>
 	<PackageId>2a596dc9-6f3e-4ed2-8c33-c2f4aa9309bb</PackageId>
 	<Configurations>Debug;Release;Publish</Configurations>
-	<DefineConstants>WPF</DefineConstants>
   </PropertyGroup>
 	<!--添加元数据文件到nupkg，组件运行时需要从该文件读取信息-->
 	<ItemGroup>
@@ -39,6 +38,6 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\Cosmos.App.Sdk.Windows\Cosmos.App.Sdk.Windows.csproj" />
 	  <ProjectReference Include="..\Cosmos.App.Sdk\Cosmos.App.Sdk.csproj" />
-	  <ProjectReference Include="..\Cosmos.App.Hithink.ProcessDemo.Shared\Cosmos.App.Hithink.ProcessDemo.Shared.csproj" />
 	</ItemGroup>
+	<Import Project="..\Cosmos.App.Hithink.ProcessDemo.Shared\Cosmos.App.Hithink.ProcessDemo.Shared.projitems" Label="Shared" />
 </Project>

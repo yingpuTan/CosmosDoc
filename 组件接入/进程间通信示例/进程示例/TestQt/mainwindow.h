@@ -4,6 +4,7 @@
 #include <QSet>
 #include <QMap>
 #include <QJsonObject>
+#include <QUuid>
 #include <functional>
 
 // 使用 PipeClient 提供的 C 接口作为底层 RPC 实现
@@ -32,6 +33,11 @@ public:
                              static_cast<int>(log.size()),
                              2);
         m_inited = ok;
+        if (ok) { 
+            // 记录当前实例并注册 PipeClient 回调（仅需关心 Notify） 
+            s_instance = this;
+            Register(nullptr, &RpcClient::onNotifyStatic, nullptr, nullptr, nullptr); 
+        }
         return ok;
     }
 
@@ -39,7 +45,7 @@ public:
     {
         if (!m_inited)
             return;
-        const std::string id     = app::GetUuid();
+        const std::string id     = genUuid();
         const std::string method = req.value(QStringLiteral("method")).toString().toStdString();
 
         Json::Value jsonParam = Json::objectValue;
@@ -84,7 +90,7 @@ public:
         if (!m_inited)
             return -1;
 
-        const std::string id     = app::GetUuid();
+        const std::string id     = genUuid();
         const std::string method = req.value(QStringLiteral("method")).toString().toStdString();
 
         const auto paramVal = req.value(QStringLiteral("param"));
@@ -193,7 +199,7 @@ public:
             return;
         }
 
-        const std::string id     = app::GetUuid();
+        const std::string id     = genUuid();
         const std::string method = req.value(QStringLiteral("method")).toString().toStdString();
 
         const auto paramVal = req.value(QStringLiteral("param"));
@@ -249,6 +255,12 @@ public:
         }).detach();
     }
 
+    // 注册来自 PipeClient 的 Notify 回调（JSON 格式的 RpcRequest）
+    void setNotifyHandler(const std::function<void(const QJsonObject &)> &cb)
+    {
+        m_notifyHandler = cb;
+    }
+
 private:
     // QJsonObject <-> Json::Value 简单互转
     static void jsonFromQJson(const QJsonObject &src, Json::Value &dst)
@@ -293,7 +305,44 @@ private:
         }
     }
 
+    // 生成唯一 ID，替代 app::GetUuid，避免依赖 PipeClient 内部实现
+    static std::string genUuid()
+    {
+        QUuid uuid = QUuid::createUuid();
+        return uuid.toString(QUuid::WithoutBraces).toStdString();
+    }
+
+    // PipeClient Notify 回调（协议 level 2：直接传 JSON 文本）
+    static void CDECL_CALL onNotifyStatic(void* in, int size)
+    {
+        if (!s_instance || !in || size <= 0)
+            return;
+
+        const char *data = static_cast<const char*>(in);
+        std::string jsonStr(data, size);
+
+        Json::CharReaderBuilder builder;
+        Json::Value root;
+        std::string errs;
+        std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+        if (!reader->parse(jsonStr.c_str(),
+                           jsonStr.c_str() + jsonStr.size(),
+                           &root, &errs)) {
+            return;
+        }
+
+        QJsonObject obj;
+        qjsonFromJson(root, obj);
+
+        if (s_instance->m_notifyHandler) {
+            s_instance->m_notifyHandler(obj);
+        }
+    }
+
     bool m_inited{false};
+    std::function<void(const QJsonObject &)> m_notifyHandler;
+
+    static RpcClient *s_instance;
 };
 
 class MainWindow : public QMainWindow
@@ -303,8 +352,8 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
 
-    void setPipeName(const QString &name) { m_pipeName = name; }
-    void setWndInfo(const QString &info)  { m_wndInfo  = info; }
+    void setPipeName(const QString &name);
+    void setWndInfo(const QString &info);
 
 private slots:
     void onNotifyClicked();
@@ -321,6 +370,8 @@ private:
     void connectSignals();
     void connectPipe();
     void setupParentWindow();   // 使用宿主传入的窗口信息进行嵌入（仅在 Windows 下有效）
+    void resizeEmbeddedWindow(int w, int h);
+    void handleRemoteNotify(const QJsonObject &msg);
     void addStatusMessage(const QString &msg);
     void writeLog(const QString &msg);
 
