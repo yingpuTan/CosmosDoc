@@ -9,6 +9,7 @@
 #include <QDebug>
 #include <QCoreApplication>
 #include <QEventLoop>
+#include <QTimer>
 #include <QThread>
 #include <algorithm>
 
@@ -774,6 +775,14 @@ void MainWindow::createAndEmbedWidget()
 #endif
             
             if (ok && childWindowId != 0) {
+                // Cosmos 引擎在 CreateWidget 返回成功后，原生窗口有时仍需要一点时间才能稳定被 Qt 接管。
+                // 为降低“第二次点击仍残留/未嵌入”的偶发问题，这里做一个很短的等待。
+                {
+                    QEventLoop waitLoop;
+                    QTimer::singleShot(200, &waitLoop, &QEventLoop::quit);
+                    waitLoop.exec();
+                }
+
 #ifdef Q_OS_LINUX
                 // 先验证/修正 X11 父子关系，再交给 Qt 包装，避免出现“窗口存在但不在容器里”
                 const bool reparentOk = EnsureWindowReparentedX11(

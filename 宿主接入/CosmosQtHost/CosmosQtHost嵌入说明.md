@@ -180,6 +180,9 @@ WId childWindowId = 0;
 m_embeddedWindow = QWindow::fromWinId(childWindowId);
 ```
 
+**注意（新增时序兜底）**：
+本 Demo 在调用 `QWindow::fromWinId(...)` 以及 `QWidget::createWindowContainer(...)` 之前，会额外等待约 `200ms`（期间会让 Qt 事件循环继续处理）。原因是 Cosmos 在 `CreateWidget` 返回成功后，嵌入目标原生窗口可能还需要一点时间才能稳定被 Qt 接管；这一步可以降低“第二次点击仍残留/未嵌入”的偶发问题。
+
 **含义**：
 
 - `QWindow::fromWinId` 不会创建新窗口，只是用 Qt 的 `QWindow` 来管理一个已有的外部窗口。
@@ -291,13 +294,14 @@ if (m_embeddedWidget) {
 2. **父窗口未就绪**：Qt 容器刚创建出 `winId()`，但尚未映射稳定到 X server，导致第一次 reparent 偶发失败。
 3. **重入触发**：连续点击创建/销毁，旧窗口状态与新窗口状态交错，出现句柄对应关系错乱。
 
-### 6.3 建议处理策略（已在 Demo 落地）
+### 6.3 建议处理策略
 
 1. **先让父窗口稳定**：在调用 `CreateWidget` 前，先 `show()/raise()` 容器并 `processEvents()`。
 2. **先验证再封装**：拿到 `WindowHandle` 后，在 Linux/X11 下先验证 child 的实际 parent 是否为容器 parent。
 3. **验证失败就强制重挂并重试**：执行 `XReparentWindow + XMoveResizeWindow + XMapRaised + XFlush`，并循环验证直到成功或超时。
 4. **最后再 `fromWinId/createWindowContainer`**：避免在父子关系未稳定时过早封装，导致“封装成功但没嵌入”。
 5. **增加重入保护**：创建过程进行中禁止再次触发创建，降低并发时序问题。
+6. **增加短等待提升稳定性**：（Windows/Linux 通用）在获得 `childWindowId` 后、执行 `fromWinId/createWindowContainer` 之前，等待约 `200ms`，降低窗口刚创建/刚销毁交错时序引发的偶发残留问题。
 
 ### 6.4 最小排查清单
 
