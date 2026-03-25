@@ -11,6 +11,8 @@
 #include <QEventLoop>
 #include <QThread>
 #include <algorithm>
+#include <cstring>
+#include <QMetaObject>
 
 #include "Cosmos.Product.Sdk.h"
 #include "platform.h"
@@ -24,6 +26,7 @@
 
 #ifdef Q_OS_LINUX
 #  include <X11/Xlib.h>
+#  include <X11/Xutil.h>
 #endif
 
 // ---------------- Cosmos C SDK 直接封装（最小化） ----------------
@@ -36,6 +39,8 @@ Cosmos_InitializeEnvironmentDelegate g_initEnv = nullptr;
 Cosmos_UninitializeEnvironmentDelegate g_uninitEnv = nullptr;
 Cosmos_InvokeDelegate g_invoke = nullptr;
 Cosmos_ReleaseInvokeResponseDelegate g_releaseInvoke = nullptr;
+
+MainWindow* g_mainWindow = nullptr;
 
 // Base64 编码（复制自 CosmosHost 示例）
 static const std::string base64_chars =
@@ -169,16 +174,184 @@ bool EnsureWindowReparentedX11(WId childWindowId, WId parentWindowId, int width,
     }
     return success;
 }
+
+bool X11WindowExists(Display* dpy, Window w)
+{
+    if (!dpy || !w) return false;
+    XWindowAttributes attrs;
+    // XGetWindowAttributes 在窗口不存在（BadWindow）时会失败，返回值为 0
+    return XGetWindowAttributes(dpy, w, &attrs) != 0;
+}
+
+void LogX11WindowAttributes(Window w, const char* tag)
+{
+    Display* dpy = XOpenDisplay(nullptr);
+    if (!dpy) return;
+    XWindowAttributes attrs;
+    if (XGetWindowAttributes(dpy, w, &attrs)) {
+        qDebug() << tag
+                 << "winId:" << static_cast<qulonglong>(static_cast<quintptr>(w))
+                 << "map_state:" << static_cast<int>(attrs.map_state)
+                 << "geom:" << attrs.x << attrs.y << attrs.width << attrs.height;
+    } else {
+        qDebug() << tag << "XGetWindowAttributes failed for winId:"
+                 << static_cast<qulonglong>(static_cast<quintptr>(w));
+    }
+    XCloseDisplay(dpy);
+}
+
+Window FindTopLevelX11(Display* dpy, Window w)
+{
+    if (!dpy || !w) return 0;
+
+    Window current = w;
+    for (int i = 0; i < 64; ++i) {
+        Window root = 0;
+        Window parent = 0;
+        Window* children = nullptr;
+        unsigned int nchildren = 0;
+        const Status ok = XQueryTree(dpy, current, &root, &parent, &children, &nchildren);
+        if (children) XFree(children);
+        if (!ok) return current;
+        if (parent == 0 || parent == root) return current;
+        current = parent;
+    }
+    return current;
+}
+
+void UnmapWindowX11(Window w)
+{
+    if (!w) return;
+    Display* dpy = XOpenDisplay(nullptr);
+    if (!dpy) return;
+    // 对顶层窗口更友好：优先走 Withdraw（通知 WM），同时做多次 Unmap 兜底，
+    // 避免被对端立即 remap 导致“弹窗不消失”。
+    const int screen = DefaultScreen(dpy);
+    XWithdrawWindow(dpy, w, screen);
+    XFlush(dpy);
+
+    for (int i = 0; i < 30; ++i) {
+        XWindowAttributes attrs;
+        const bool ok = XGetWindowAttributes(dpy, w, &attrs) != 0;
+        if (!ok) break; // 窗口不存在了
+        if (attrs.map_state != IsViewable) break; // 已经不可见
+        XUnmapWindow(dpy, w);
+        XFlush(dpy);
+        QThread::msleep(50);
+    }
+    XCloseDisplay(dpy);
+}
+
+void RequestHideOrCloseX11Window(Window w, bool forceDestroy)
+{
+    if (!w) return;
+    Display* dpy = XOpenDisplay(nullptr);
+    if (!dpy) return;
+
+    Window root = DefaultRootWindow(dpy);
+
+    // 1) 先尝试标准 EWMH：请求隐藏
+    Atom netWmState = XInternAtom(dpy, "_NET_WM_STATE", False);
+    Atom netWmStateHidden = XInternAtom(dpy, "_NET_WM_STATE_HIDDEN", False);
+    if (netWmState != None && netWmStateHidden != None) {
+        XClientMessageEvent ev;
+        std::memset(&ev, 0, sizeof(ev));
+        ev.type = ClientMessage;
+        ev.window = root;
+        ev.message_type = netWmState;
+        ev.format = 32;
+        ev.data.l[0] = 1; // 1: add
+        ev.data.l[1] = netWmStateHidden;
+        ev.data.l[2] = 0;
+        ev.data.l[3] = 0;
+        ev.data.l[4] = 0;
+        XSendEvent(dpy, root, False, SubstructureRedirectMask | SubstructureNotifyMask,
+                   reinterpret_cast<XEvent*>(&ev));
+    }
+
+    // 2) 再尝试标准 EWMH：请求关闭
+    Atom netClose = XInternAtom(dpy, "_NET_CLOSE_WINDOW", False);
+    if (netClose != None) {
+        XClientMessageEvent ev;
+        std::memset(&ev, 0, sizeof(ev));
+        ev.type = ClientMessage;
+        ev.window = root;
+        ev.message_type = netClose;
+        ev.format = 32;
+        ev.data.l[0] = w;
+        ev.data.l[1] = 0;
+        ev.data.l[2] = 0;
+        ev.data.l[3] = 0;
+        ev.data.l[4] = 0;
+        XSendEvent(dpy, root, False, SubstructureRedirectMask | SubstructureNotifyMask,
+                   reinterpret_cast<XEvent*>(&ev));
+    } else {
+        // 3) 兼容：尝试 WM_DELETE_WINDOW
+        Atom wmProtocols = XInternAtom(dpy, "WM_PROTOCOLS", False);
+        Atom wmDelete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+        if (wmProtocols != None && wmDelete != None) {
+            int n = 0;
+            Atom* protocols = nullptr;
+            if (XGetWMProtocols(dpy, w, &protocols, &n) && protocols && n > 0) {
+                bool supports = false;
+                for (int i = 0; i < n; ++i) {
+                    if (protocols[i] == wmDelete) {
+                        supports = true;
+                        break;
+                    }
+                }
+                if (supports) {
+                    XEvent ev;
+                    std::memset(&ev, 0, sizeof(ev));
+                    ev.xclient.type = ClientMessage;
+                    ev.xclient.message_type = wmProtocols;
+                    ev.xclient.display = dpy;
+                    ev.xclient.window = w;
+                    ev.xclient.format = 32;
+                    ev.xclient.data.l[0] = wmDelete;
+                    ev.xclient.data.l[1] = CurrentTime;
+                    XSendEvent(dpy, w, False, NoEventMask, &ev);
+                }
+            }
+            if (protocols) XFree(protocols);
+        }
+    }
+
+    XFlush(dpy);
+
+    // 4) 等一等：看能否变为不可见/被销毁
+    for (int i = 0; i < 40; ++i) { // 4s 左右
+        if (!X11WindowExists(dpy, w)) break;
+        XWindowAttributes attrs;
+        if (XGetWindowAttributes(dpy, w, &attrs)) {
+            if (attrs.map_state != IsViewable) break;
+        }
+        QThread::msleep(100);
+    }
+
+    // 5) 兜底：如果还存在，按需强制销毁
+    if (forceDestroy && X11WindowExists(dpy, w)) {
+        XDestroyWindow(dpy, w);
+        XFlush(dpy);
+    }
+
+    XCloseDisplay(dpy);
+}
 #endif
 
 // 宿主回调：本 Demo 只简单返回成功，方便引擎初始化
 Cosmos_Result* Cosmos_Notify_Callback(const Cosmos_CallContext* callContext, const Cosmos_NotifyRequest* notifyRequest)
 {
     Q_UNUSED(callContext);
-    Q_UNUSED(notifyRequest);
     Cosmos_Result* result = new Cosmos_Result;
     result->Code = 200;
     result->Message = "";
+
+    if (g_mainWindow && notifyRequest) {
+        const char* topic = notifyRequest->Topic ? notifyRequest->Topic : "";
+        const char* message = notifyRequest->Message ? notifyRequest->Message : "";
+        g_mainWindow->handleCosmosNotify(topic, message);
+    }
     return result;
 }
 
@@ -265,6 +438,8 @@ void Cosmos_ReleaseSubscribeResponse_Callback(const Cosmos_CallContext* callCont
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
+    g_mainWindow = this;
+
     auto *central = new QWidget(this);
     auto *layout  = new QVBoxLayout(central);
 
@@ -288,6 +463,18 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
+    if (g_mainWindow == this) {
+        g_mainWindow = nullptr;
+    }
+
+    // 兜底：如果没有触发 closeEvent（或触发顺序异常），避免 Cosmos 侧窗口在 X11 上残留
+    if (!m_cosmosShutdown) {
+        if (g_invoke && (!m_widgetHandle.empty() || !m_windowHandle.empty())) {
+            destroyWidget();
+        }
+        shutdownCosmos();
+    }
+
     // 清理嵌入的窗口
     // 注意：QWidget::createWindowContainer 创建的容器会管理 QWindow 的生命周期
     // 删除 m_embeddedWidget 时，Qt 会自动删除它关联的 m_embeddedWindow
@@ -439,12 +626,51 @@ void MainWindow::destroyWidget()
 {
     // 如果已有组件，先关闭它
     if (m_widgetHandle.empty() && m_windowHandle.empty()) {
-        return;  // 没有已创建的组件，直接返回
+#ifdef Q_OS_LINUX
+        // 兜底：如果 Cosmos 句柄已清空但 X11 侧仍残留“壳窗”，也尝试清理
+        if (m_x11ShellWindowId) {
+            const Window shellWinId = static_cast<Window>(m_x11ShellWindowId);
+            Display* dpy = XOpenDisplay(nullptr);
+            if (dpy) {
+                const bool exists = X11WindowExists(dpy, shellWinId);
+                XCloseDisplay(dpy);
+                if (exists) {
+                    RequestHideOrCloseX11Window(shellWinId, true);
+                }
+            }
+            m_x11ShellWindowId = 0;
+        }
+#endif
+        return;
     }
 
     if (!g_invoke) {
         qDebug() << "Cosmos SDK not initialized, cannot destroy widget";
         return;
+    }
+
+    // 在清理本地状态前先解析 WindowHandle，用于 X11 销毁确认（避免“底窗残留”难以定位）
+    WId childWindowIdForCheck = 0;
+#ifdef Q_OS_LINUX
+    {
+        bool ok = false;
+        unsigned long x11WindowId = QString::fromStdString(m_windowHandle).toULong(&ok, 10);
+        if (ok && x11WindowId != 0) {
+            childWindowIdForCheck = reinterpret_cast<WId>(static_cast<quintptr>(x11WindowId));
+        }
+    }
+#endif
+
+    // 先让 Qt 侧停止管理 native window，避免 Cosmos DestroyWidget 后 Qt 仍然去 Unmap/Reparent，
+    // 从而触发 X11 的 BadWindow。
+    if (m_embeddedWidget) {
+        m_embeddedWidget->setParent(nullptr);
+        delete m_embeddedWidget;
+        m_embeddedWidget = nullptr;
+        m_embeddedWindow = nullptr;
+    } else if (m_embeddedWindow) {
+        delete m_embeddedWindow;
+        m_embeddedWindow = nullptr;
     }
 
     // 构造 DestroyWidget 调用请求
@@ -494,6 +720,57 @@ void MainWindow::destroyWidget()
         qDebug() << "DestroyWidget call failed (null response)";
     }
     delete req;
+
+    // Linux/X11 下：偶现可能是 Cosmos 销毁存在异步延迟。
+    // 做一次短轮询，确认 native window 是否还存在，便于你观测“底窗未销毁”的真实原因。
+#ifdef Q_OS_LINUX
+    if (childWindowIdForCheck) {
+        Display* dpy = XOpenDisplay(nullptr);
+        if (dpy) {
+            const int kMaxAttempts = 30;  // 3s 左右
+            bool alive = false;
+            for (int i = 0; i < kMaxAttempts; ++i) {
+                alive = X11WindowExists(dpy, static_cast<Window>(childWindowIdForCheck));
+                if (!alive) break;
+                QThread::msleep(100);
+            }
+            XCloseDisplay(dpy);
+            if (alive) {
+                qDebug() << "Warning: X11 window may still exist after DestroyWidget, winId:"
+                         << static_cast<qulonglong>(reinterpret_cast<quintptr>(childWindowIdForCheck));
+            }
+        }
+    }
+
+    // 再兜底隐藏一次“壳窗口”，避免桌面残留弹窗。
+    if (m_x11ShellWindowId) {
+        const Window shellWinId = static_cast<Window>(m_x11ShellWindowId);
+        m_x11ShellWindowId = 0; // 先清掉标记，避免后续逻辑重复处理
+
+#ifdef Q_OS_LINUX
+        // 先请求隐藏/关闭，不直接硬销毁，降低竞态下 BadWindow 概率
+        if (XOpenDisplay(nullptr)) {
+            // RequestHideOrClose 内部会做一定的存在性检查与必要时的兜底 destroy
+            RequestHideOrCloseX11Window(shellWinId, false);
+            // 再简单确认一次是否仍存在（有些 WM 会延迟处理）
+            Display* dpy = XOpenDisplay(nullptr);
+            if (dpy) {
+                const int kMaxAttempts = 20;
+                bool alive = true;
+                for (int i = 0; i < kMaxAttempts; ++i) {
+                    alive = X11WindowExists(dpy, shellWinId);
+                    if (!alive) break;
+                    QThread::msleep(100);
+                }
+                if (alive) {
+                    RequestHideOrCloseX11Window(shellWinId, true);
+                }
+                XCloseDisplay(dpy);
+            }
+        }
+#endif
+    }
+#endif
 
     // 清理本地状态
     m_widgetHandle.clear();
@@ -583,6 +860,41 @@ void MainWindow::closeEvent(QCloseEvent *event)
     event->accept();
 }
 
+void MainWindow::handleCosmosNotify(const char* topic, const char* message)
+{
+    const std::string topicStr = topic ? topic : "";
+    const std::string messageStr = message ? message : "";
+
+    // 仅用于定位关闭/销毁触发点：你点击弹窗关闭按钮时，通常会触发 notify。
+    qDebug() << "Cosmos Notify topic:" << QString::fromStdString(topicStr)
+             << "message:" << QString::fromStdString(messageStr);
+
+    if (m_cosmosShutdown) return;
+    if (m_widgetHandle.empty() && m_windowHandle.empty()) return;
+
+    // 尝试用关键词判断“关闭/销毁”类事件（中英文都兼容）。
+    auto containsAny = [](const std::string& s, std::initializer_list<const char*> keys) -> bool {
+        for (const char* k : keys) {
+            if (!k) continue;
+            if (s.find(k) != std::string::npos) return true;
+        }
+        return false;
+    };
+
+    const bool isCloseOrDestroy =
+        containsAny(topicStr, {"Close", "close", "Closing", "Destroy", "destroy", "ShutDown", "Shutdown", "关闭", "销毁"}) ||
+        containsAny(messageStr, {"Close", "close", "Closing", "Destroy", "destroy", "Shutdown", "关闭", "销毁"});
+
+    if (!isCloseOrDestroy) return;
+
+    // 回调通常不在 UI 线程执行；用 queued connection 确保 destroyWidget 在 Qt 线程执行。
+    QMetaObject::invokeMethod(this, [this]() {
+        if (!m_cosmosShutdown && (!m_widgetHandle.empty() || !m_windowHandle.empty())) {
+            destroyWidget();
+        }
+    }, Qt::QueuedConnection);
+}
+
 void MainWindow::createAndEmbedWidget()
 {
     if (m_embeddingInProgress) {
@@ -611,6 +923,12 @@ void MainWindow::createAndEmbedWidget()
     if (!m_widgetHandle.empty() || !m_windowHandle.empty()) {
         destroyWidget();
     }
+#ifdef Q_OS_LINUX
+    // 兜底：若上一轮 Cosmos 句柄已清空但 X11 仍残留壳窗，也清理一下再创建
+    if (m_x11ShellWindowId) {
+        destroyWidget();
+    }
+#endif
 
     // 让容器先进入稳定状态，降低 Linux/X11 下 ParentHandle 刚创建即使用的竞态概率
     m_cosmosContainer->show();
@@ -655,9 +973,9 @@ void MainWindow::createAndEmbedWidget()
                            rapidjson::Value(parentStr.toStdString().c_str(), doc.GetAllocator()),
                            doc.GetAllocator());
     jsPreference.AddMember(rapidjson::StringRef("TitleBarVisibility"),
-                           rapidjson::StringRef("Visible"), doc.GetAllocator());
+                           rapidjson::StringRef("Hidden"), doc.GetAllocator());
     jsPreference.AddMember(rapidjson::StringRef("WindowVisibility"),
-                           rapidjson::StringRef("Visible"), doc.GetAllocator());
+                           rapidjson::StringRef("Hidden"), doc.GetAllocator());
     jsPreference.AddMember(rapidjson::StringRef("ResizeMode"),
                            rapidjson::StringRef("CanResize"), doc.GetAllocator());
     jsPreference.AddMember(rapidjson::StringRef("WidgetWidth"),
@@ -775,6 +1093,21 @@ void MainWindow::createAndEmbedWidget()
             
             if (ok && childWindowId != 0) {
 #ifdef Q_OS_LINUX
+                // X11 下：CreateWidget 早期可能会先弹出一个顶层“壳窗口”，随后内容子窗才被嵌入 Qt。
+                // 这里预先抓取该顶层窗口句柄，嵌入成功后主动隐藏，避免桌面残留弹窗。
+                m_x11ShellWindowId = 0;
+                {
+                    Display* dpy = XOpenDisplay(nullptr);
+                    if (dpy) {
+                        const Window top = FindTopLevelX11(dpy, static_cast<Window>(childWindowId));
+                        XCloseDisplay(dpy);
+                        if (top && top != static_cast<Window>(childWindowId)) {
+                            m_x11ShellWindowId = static_cast<unsigned long>(top);
+                            qDebug() << "X11 shell(top-level) window id:" << static_cast<qulonglong>(top);
+                        }
+                    }
+                }
+
                 // 先验证/修正 X11 父子关系，再交给 Qt 包装，避免出现“窗口存在但不在容器里”
                 const bool reparentOk = EnsureWindowReparentedX11(
                     childWindowId,
@@ -783,6 +1116,8 @@ void MainWindow::createAndEmbedWidget()
                     std::max(1, m_cosmosContainer->height()));
                 if (!reparentOk) {
                     qDebug() << "Failed to reparent child window to Qt container on X11";
+                    // 如果 Cosmos 已经创建了窗口，但我们无法完成嵌入，
+                    destroyWidget();
                     finishEmbedding();
                     return;
                 }
@@ -829,18 +1164,39 @@ void MainWindow::createAndEmbedWidget()
                         qDebug() << "createWindowContainer failed";
                         delete m_embeddedWindow;
                         m_embeddedWindow = nullptr;
+                        // 嵌入失败，避免 Cosmos 侧创建的原生窗口残留
+                        destroyWidget();
+                        finishEmbedding();
+                        return;
                     }
                 } else {
                     qDebug() << "QWindow::fromWinId failed, window ID:" << QString::fromStdString(m_windowHandle);
+                    // 嵌入失败，避免 Cosmos 侧创建的原生窗口残留
+                    destroyWidget();
+                    finishEmbedding();
+                    return;
                 }
             } else {
                 qDebug() << "Window handle conversion failed:" << QString::fromStdString(m_windowHandle);
+                // 句柄转换失败也可能导致 Cosmos 创建了窗口但无法嵌入，做兜底销毁
+                destroyWidget();
+                finishEmbedding();
+                return;
             }
         } else {
             qDebug() << "Response data missing WindowHandle field";
+            // 既然 Cosmos 返回了组件创建成功信息，但缺少必要句柄，
+            // 这里兜底触发销毁避免残留窗口。
+            destroyWidget();
+            finishEmbedding();
+            return;
         }
     } else {
         qDebug() << "Response data format incorrect, missing ActionContext.Return";
+        // 返回结构异常时可能仍然创建了组件窗口，尝试销毁兜底
+        destroyWidget();
+        finishEmbedding();
+        return;
     }
 
     qDebug() << "CreateWidget succeeded, component should be embedded in Qt container";
