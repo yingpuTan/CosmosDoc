@@ -7,6 +7,10 @@
 #include <QWindow>
 #include <QCloseEvent>
 #include <QDebug>
+#include <QCoreApplication>
+#include <QEventLoop>
+#include <QThread>
+#include <algorithm>
 
 #include "Cosmos.Product.Sdk.h"
 #include "platform.h"
@@ -16,6 +20,10 @@
 
 #ifdef Q_OS_WIN
 #  include <windows.h>
+#endif
+
+#ifdef Q_OS_LINUX
+#  include <X11/Xlib.h>
 #endif
 
 // ---------------- Cosmos C SDK 直接封装（最小化） ----------------
@@ -76,6 +84,92 @@ std::string GetMainAppName()
     return "Cosmos.MainApp.CrossPlatform";
 #endif
 }
+
+#ifdef Q_OS_LINUX
+bool QueryWindowParentX11(Window child, Window& parentOut)
+{
+    parentOut = 0;
+    Display* dpy = XOpenDisplay(nullptr);
+    if (!dpy) {
+        qDebug() << "XOpenDisplay failed when querying parent window";
+        return false;
+    }
+
+    Window root = 0;
+    Window parent = 0;
+    Window* children = nullptr;
+    unsigned int nchildren = 0;
+    const Status ok = XQueryTree(dpy, child, &root, &parent, &children, &nchildren);
+    if (children) {
+        XFree(children);
+    }
+    XCloseDisplay(dpy);
+
+    if (!ok) {
+        qDebug() << "XQueryTree failed for child window:" << static_cast<qulonglong>(child);
+        return false;
+    }
+
+    parentOut = parent;
+    return true;
+}
+
+bool EnsureWindowReparentedX11(WId childWindowId, WId parentWindowId, int width, int height)
+{
+    const Window child = static_cast<Window>(childWindowId);
+    const Window parent = static_cast<Window>(parentWindowId);
+    if (child == 0 || parent == 0) {
+        qDebug() << "Invalid X11 window id, child:" << static_cast<qulonglong>(child)
+                 << "parent:" << static_cast<qulonglong>(parent);
+        return false;
+    }
+
+    Display* dpy = XOpenDisplay(nullptr);
+    if (!dpy) {
+        qDebug() << "XOpenDisplay failed when reparenting child window";
+        return false;
+    }
+
+    constexpr int kMaxAttempts = 30;
+    constexpr int kSleepMs = 100;
+    bool success = false;
+
+    for (int i = 0; i < kMaxAttempts; ++i) {
+        Window currentParent = 0;
+        if (QueryWindowParentX11(child, currentParent) && currentParent == parent) {
+            success = true;
+            qDebug() << "X11 parent already correct, child:" << static_cast<qulonglong>(child)
+                     << "parent:" << static_cast<qulonglong>(parent)
+                     << "attempt:" << (i + 1);
+            break;
+        }
+
+        XReparentWindow(dpy, child, parent, 0, 0);
+        XMoveResizeWindow(dpy, child, 0, 0,
+                          static_cast<unsigned int>(std::max(1, width)),
+                          static_cast<unsigned int>(std::max(1, height)));
+        XMapRaised(dpy, child);
+        XFlush(dpy);
+
+        QCoreApplication::processEvents(QEventLoop::AllEvents, kSleepMs);
+        QThread::msleep(kSleepMs);
+    }
+
+    XCloseDisplay(dpy);
+
+    if (!success) {
+        Window finalParent = 0;
+        if (QueryWindowParentX11(child, finalParent)) {
+            qDebug() << "X11 reparent timeout, child parent is"
+                     << static_cast<qulonglong>(finalParent)
+                     << "expected:" << static_cast<qulonglong>(parent);
+        } else {
+            qDebug() << "X11 reparent timeout and final parent query failed";
+        }
+    }
+    return success;
+}
+#endif
 
 // 宿主回调：本 Demo 只简单返回成功，方便引擎初始化
 Cosmos_Result* Cosmos_Notify_Callback(const Cosmos_CallContext* callContext, const Cosmos_NotifyRequest* notifyRequest)
@@ -174,16 +268,16 @@ MainWindow::MainWindow(QWidget *parent)
     auto *central = new QWidget(this);
     auto *layout  = new QVBoxLayout(central);
 
-    auto *btnCreate = new QPushButton(QStringLiteral("创建并嵌入 Cosmos 组件"), this);
+    m_btnCreate = new QPushButton(QStringLiteral("创建并嵌入 Cosmos 组件"), this);
     m_cosmosContainer = new QWidget(this);
     m_cosmosContainer->setMinimumSize(600, 400);
     m_cosmosContainer->setStyleSheet(QStringLiteral("background-color:#202020;"));
 
-    layout->addWidget(btnCreate);
+    layout->addWidget(m_btnCreate);
     layout->addWidget(m_cosmosContainer, 1);
     setCentralWidget(central);
 
-    connect(btnCreate, &QPushButton::clicked,
+    connect(m_btnCreate, &QPushButton::clicked,
             this, &MainWindow::onCreateWidgetClicked);
 
     setWindowTitle(QStringLiteral("Cosmos Qt 宿主 Demo"));
@@ -491,8 +585,25 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::createAndEmbedWidget()
 {
+    if (m_embeddingInProgress) {
+        qDebug() << "Embedding is already in progress, skip this request";
+        return;
+    }
+
+    m_embeddingInProgress = true;
+    if (m_btnCreate) {
+        m_btnCreate->setEnabled(false);
+    }
+    auto finishEmbedding = [this]() {
+        m_embeddingInProgress = false;
+        if (m_btnCreate) {
+            m_btnCreate->setEnabled(true);
+        }
+    };
+
     if (!m_cosmosContainer || !g_invoke) {
         qDebug() << "Environment not initialized";
+        finishEmbedding();
         return;
     }
 
@@ -501,10 +612,16 @@ void MainWindow::createAndEmbedWidget()
         destroyWidget();
     }
 
+    // 让容器先进入稳定状态，降低 Linux/X11 下 ParentHandle 刚创建即使用的竞态概率
+    m_cosmosContainer->show();
+    m_cosmosContainer->raise();
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
     // 确保容器窗口已创建（调用 winId() 会强制创建窗口）
     WId parentWindowId = m_cosmosContainer->winId();
     if (!parentWindowId) {
         qDebug() << "Failed to get Qt container window ID";
+        finishEmbedding();
         return;
     }
 
@@ -530,6 +647,7 @@ void MainWindow::createAndEmbedWidget()
     parentStr = QString::number(static_cast<unsigned long>(widValue));
 #else
     qDebug() << "Window embedding not supported on this platform";
+    finishEmbedding();
     return;
 #endif
 
@@ -591,6 +709,7 @@ void MainWindow::createAndEmbedWidget()
     if (!resp || !resp->Result) {
         qDebug() << "CreateWidget call failed (null response)";
         delete req;
+        finishEmbedding();
         return;
     }
 
@@ -605,6 +724,7 @@ void MainWindow::createAndEmbedWidget()
 
     if (code != 200) {
         qDebug() << "CreateWidget failed, code =" << code;
+        finishEmbedding();
         return;
     }
 
@@ -613,6 +733,7 @@ void MainWindow::createAndEmbedWidget()
     docResult.Parse(dataStr.c_str());
     if (docResult.HasParseError()) {
         qDebug() << "CreateWidget result parse failed, error offset:" << docResult.GetErrorOffset();
+        finishEmbedding();
         return;
     }
 
@@ -653,6 +774,20 @@ void MainWindow::createAndEmbedWidget()
 #endif
             
             if (ok && childWindowId != 0) {
+#ifdef Q_OS_LINUX
+                // 先验证/修正 X11 父子关系，再交给 Qt 包装，避免出现“窗口存在但不在容器里”
+                const bool reparentOk = EnsureWindowReparentedX11(
+                    childWindowId,
+                    parentWindowId,
+                    std::max(1, m_cosmosContainer->width()),
+                    std::max(1, m_cosmosContainer->height()));
+                if (!reparentOk) {
+                    qDebug() << "Failed to reparent child window to Qt container on X11";
+                    finishEmbedding();
+                    return;
+                }
+#endif
+
                 // 使用 QWindow::fromWinId 创建 QWindow
                 // 先清理旧的窗口（如果存在）
                 if (m_embeddedWidget) {
@@ -709,5 +844,6 @@ void MainWindow::createAndEmbedWidget()
     }
 
     qDebug() << "CreateWidget succeeded, component should be embedded in Qt container";
+    finishEmbedding();
 }
 

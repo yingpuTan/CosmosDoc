@@ -277,3 +277,32 @@ if (m_embeddedWidget) {
 - **Q：嵌入的 Cosmos 窗口能否自动随 Qt 窗口缩放？**  
   **A**：可以，只要 `m_embeddedWidget` 被放在 Qt 布局中（这里用的是 `QVBoxLayout`），布局会根据宿主窗口大小调整其尺寸，Qt 会同步这个 `QWidget` 对应的 `QWindow` 大小，从而间接调整嵌入窗口。
 
+---
+
+## 6. Linux(X11) 偶发未嵌入的场景与处理
+
+### 6.1 典型现象
+
+- `CreateWidget` 返回成功，且能看到组件窗口，但该窗口是独立顶层窗口，没有出现在 Qt 的 `m_cosmosContainer` 内。
+
+### 6.2 常见触发条件
+
+1. **时序竞态（最常见）**：`CreateWidget` 返回时，子窗口句柄已可用，但 X11 的父子重挂关系尚未稳定。
+2. **父窗口未就绪**：Qt 容器刚创建出 `winId()`，但尚未映射稳定到 X server，导致第一次 reparent 偶发失败。
+3. **重入触发**：连续点击创建/销毁，旧窗口状态与新窗口状态交错，出现句柄对应关系错乱。
+
+### 6.3 建议处理策略（已在 Demo 落地）
+
+1. **先让父窗口稳定**：在调用 `CreateWidget` 前，先 `show()/raise()` 容器并 `processEvents()`。
+2. **先验证再封装**：拿到 `WindowHandle` 后，在 Linux/X11 下先验证 child 的实际 parent 是否为容器 parent。
+3. **验证失败就强制重挂并重试**：执行 `XReparentWindow + XMoveResizeWindow + XMapRaised + XFlush`，并循环验证直到成功或超时。
+4. **最后再 `fromWinId/createWindowContainer`**：避免在父子关系未稳定时过早封装，导致“封装成功但没嵌入”。
+5. **增加重入保护**：创建过程进行中禁止再次触发创建，降低并发时序问题。
+
+### 6.4 最小排查清单
+
+- 检查 `ParentHandle` 与 `WindowHandle` 是否为有效十进制字符串且非 0。
+- 在失败现场打印 child 当前 parent（通过 `XQueryTree`）与目标 parent 对比。
+- 观察是否连续触发了多次 `CreateWidget`（按钮重复点击）。
+- 若仅 Linux 出现且为 X11，会优先怀疑重挂时序和父窗口映射状态问题。
+

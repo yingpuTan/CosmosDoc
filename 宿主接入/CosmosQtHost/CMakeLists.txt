@@ -104,6 +104,8 @@ else()
     target_link_libraries(CosmosQtHost PRIVATE Threads::Threads)
     if (UNIX)
         target_link_libraries(CosmosQtHost PRIVATE dl)
+        find_package(X11 REQUIRED) 
+        target_link_libraries(CosmosQtHost PRIVATE X11::X11)
     endif()
 endif()
 
