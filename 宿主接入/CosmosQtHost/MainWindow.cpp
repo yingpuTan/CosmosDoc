@@ -662,9 +662,9 @@ void MainWindow::createAndEmbedWidget()
     jsPreference.AddMember(rapidjson::StringRef("ResizeMode"),
                            rapidjson::StringRef("CanResize"), doc.GetAllocator());
     jsPreference.AddMember(rapidjson::StringRef("WidgetWidth"),
-                           600, doc.GetAllocator());
+                           1, doc.GetAllocator());
     jsPreference.AddMember(rapidjson::StringRef("WidgetHeight"),
-                           400, doc.GetAllocator());
+                           1, doc.GetAllocator());
     jsPreference.AddMember(rapidjson::StringRef("BorderThickness"),
                            rapidjson::StringRef("1"), doc.GetAllocator());
     jsPreference.AddMember(rapidjson::StringRef("WindowTop"),
